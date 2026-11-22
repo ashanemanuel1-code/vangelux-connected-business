@@ -5,7 +5,7 @@ import { money, fmtDate, today, num } from '../lib/format';
 import { uploadReceipt, receiptUrl, deleteReceipt } from '../lib/storage';
 import { exportRows, readRows, parseDate, toNum } from '../lib/excel';
 import { useLiveRefresh } from '../lib/useRealtime';
-import type { Expense } from '../lib/types';
+import { PAYMENT_METHODS, type Expense } from '../lib/types';
 import { useLookups, nameOf } from './useAdminData';
 import { Button, Card, Empty, Field, Modal, PageHeader, Spinner, useToast, errMsg, confirmDialog } from '../components/ui';
 
@@ -78,15 +78,44 @@ export default function Expenses() {
     if (!file) return;
     setImporting(true);
     try {
-      const data = await readRows(file);
-      const out = data.map((r) => {
-        const cat = lk.expenseCategories.find((c) => c.name.toLowerCase() === (r.category ?? '').toLowerCase());
-        return { expense_date: parseDate(r.date ?? r.expense_date ?? '') ?? today(), category_id: cat?.id ?? null, description: r.description || r.item || 'Imported expense', vendor: r.vendor || r.supplier || null, amount: toNum(r.amount), payment_method: r.payment_method || null };
-      }).filter((r) => r.amount > 0);
-      if (!out.length) throw new Error('No rows with an amount were found. Use the template columns: Date, Category, Description, Vendor, Amount, Payment method.');
-      const { error } = await supabase.from('expenses').insert(out);
-      if (error) throw error;
-      toast('ok', `Imported ${out.length} expenses`); load();
+      const data = await readRows(file, /expense/i);
+      // Accepts the app template (Category, Amount) and the VANGELUX expense sheet
+      // (Expense Type, Quantity, Cost per Item, Total Cost).
+      const parsed = data.map((r) => {
+        const catName = (r.category || r.expense_type || r.type || '').trim();
+        const qty = toNum(r.quantity || r.qty || '1') || 1;
+        const unit = toNum(r.cost_per_item || r.unit_cost || r.cost || r.price || '0');
+        const amount = toNum(r.amount || r.total_cost || r.total || '0') || Math.round(qty * unit * 100) / 100;
+        const base = (r.description || r.item || catName || 'Expense').trim();
+        const description = qty !== 1 && unit ? `${base} (${qty} × ${money(unit)})` : base;
+        const pm = (r.payment_method || r.payment || '').trim().toLowerCase().replace(/\s+/g, '_');
+        return { catName, row: { expense_date: parseDate(r.date ?? r.expense_date ?? '') ?? today(), description, vendor: r.vendor || r.supplier || null, amount, payment_method: pm ? (PAYMENT_METHODS.includes(pm) ? pm : pm.replace(/_/g, ' ')) : null } };
+      }).filter((x) => x.row.amount > 0);
+      if (!parsed.length) throw new Error('No rows with an amount were found. Use columns like: Date, Category (or Expense Type), Description, Quantity, Cost per Item, Total Cost (or Amount), Payment Method.');
+
+      // Expense types that aren't categories yet are created automatically.
+      const known = new Map(lk.expenseCategories.map((c) => [c.name.toLowerCase(), c.id]));
+      const missing = [...new Set(parsed.map((x) => x.catName).filter((n) => n && !known.has(n.toLowerCase())))];
+      if (missing.length) {
+        const { data: added, error } = await supabase.from('expense_categories')
+          .insert(missing.map((name, i) => ({ name, sort_order: lk.expenseCategories.length + i + 1 }))).select('id,name');
+        if (error) throw error;
+        (added ?? []).forEach((c) => known.set(c.name.toLowerCase(), c.id));
+        await lk.reload();
+      }
+
+      // Skip rows already in the app (same date, description and amount), so importing the same sheet twice is safe.
+      const dates = [...new Set(parsed.map((x) => x.row.expense_date))];
+      const { data: existing, error: exErr } = await supabase.from('expenses').select('expense_date,description,amount').in('expense_date', dates);
+      if (exErr) throw exErr;
+      const seen = new Set((existing ?? []).map((e) => `${e.expense_date}|${e.description}|${num(e.amount)}`));
+      const out = parsed
+        .map((x) => ({ ...x.row, category_id: x.catName ? known.get(x.catName.toLowerCase()) ?? null : null }))
+        .filter((r) => { const k = `${r.expense_date}|${r.description}|${r.amount}`; if (seen.has(k)) return false; seen.add(k); return true; });
+      const skipped = parsed.length - out.length;
+      if (out.length) { const { error } = await supabase.from('expenses').insert(out); if (error) throw error; }
+      toast('ok', `Imported ${out.length} expense${out.length === 1 ? '' : 's'}${skipped ? ` · ${skipped} already in the app (skipped)` : ''}${missing.length ? ` · new categories: ${missing.join(', ')}` : ''}`);
+      setMonth(''); load();
     } catch (e) { toast('error', errMsg(e)); } finally { setImporting(false); }
   }
 
@@ -105,7 +134,7 @@ export default function Expenses() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input type="month" className="field w-auto" value={month} onChange={(e) => setMonth(e.target.value)} />
         <Button variant="ghost" onClick={() => setMonth('')}>All time</Button>
-        <button className="ml-auto flex items-center gap-1 text-xs text-gold-dark underline" onClick={() => exportRows([{ Date: today(), Category: 'Printing', Description: 'DTF prints batch', Vendor: 'Print shop', Amount: 12500, 'Payment method': 'cash' }], 'vangelux-expense-import-template.xlsx', 'Expenses')}><FileSpreadsheet className="h-3.5 w-3.5" /> Import template</button>
+        <button className="ml-auto flex items-center gap-1 text-xs text-gold-dark underline" onClick={() => exportRows([{ Date: today(), 'Expense Type': 'Printing', Description: 'DTF prints batch', Quantity: 10, 'Cost per Item (LKR)': 300, 'Total Cost (LKR)': 3000, 'Payment Method': 'Bank Transfer', Vendor: 'Print shop' }], 'vangelux-expense-import-template.xlsx', 'Expenses')}><FileSpreadsheet className="h-3.5 w-3.5" /> Import template</button>
       </div>
 
       {byCat.length > 0 && <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto">{byCat.map(([n, v]) => <div key={n} className="shrink-0 rounded-xl border border-neutral-200 bg-white px-4 py-2"><p className="text-[11px] uppercase text-neutral-500">{n}</p><p className="font-semibold">{money(v)}</p></div>)}</div>}

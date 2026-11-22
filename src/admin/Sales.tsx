@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, ShoppingBag, Trash2, Upload, Download, FileSpreadsheet, X } from 'lucide-react';
+import { Plus, ShoppingBag, Trash2, Upload, Download, FileSpreadsheet, X, Eye, Printer, MessageCircle, Mail, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { money, fmtDate, today, num, label } from '../lib/format';
 import { exportRows, readRows, parseDate, toNum } from '../lib/excel';
 import { useLiveRefresh } from '../lib/useRealtime';
 import { ORDER_STATUSES, PAYMENT_METHODS, PAYMENT_STATUSES, type Customer, type Sale, type SaleItem, type StockLevel } from '../lib/types';
 import { saleTotal } from './Customers';
+import { buildInvoicePdf, saleTotals, toWhatsAppNumber } from '../lib/pdf';
+import { whatsappLink, BRAND } from '../lib/brand';
 import { Badge, Button, Card, Empty, Field, Modal, PageHeader, Spinner, useToast, errMsg, confirmDialog } from '../components/ui';
 
 type P = { id: string; name: string; sku: string; sizes: string[]; colors: string[]; selling_price: number; discount_percent: number; status: string; is_concept: boolean };
@@ -26,6 +28,8 @@ export default function Sales() {
   const [edit, setEdit] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
   const importRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -61,11 +65,11 @@ export default function Sales() {
   const draftTotal = edit ? edit.items.reduce((a, i) => a + num(i.quantity) * num(i.unit_price) - num(i.discount_amount), 0) - num(edit.discount_amount) + num(edit.delivery_fee) : 0;
   const available = (it: SaleItem) => stock.find((s) => s.product_id === it.product_id && s.size === (it.size ?? '') && s.color === (it.color ?? ''))?.quantity ?? 0;
 
-  async function save() {
-    if (!edit) return;
+  async function save(keepOpen = false): Promise<string | null> {
+    if (!edit) return null;
     const items = edit.items.filter((i) => i.description.trim() || i.product_id);
-    if (!items.length) return toast('error', 'Add at least one item');
-    if (!edit.customer_id && !edit.customer_name?.trim()) return toast('error', 'Enter a customer');
+    if (!items.length) { toast('error', 'Add at least one item'); return null; }
+    if (!edit.customer_id && !edit.customer_name?.trim()) { toast('error', 'Enter a customer'); return null; }
     setSaving(true);
     try {
       let customer_id = edit.customer_id || null;
@@ -95,8 +99,53 @@ export default function Sales() {
         const { error } = it.id ? await supabase.from('sale_items').update(row).eq('id', it.id) : await supabase.from('sale_items').insert(row);
         if (error) throw error;
       }
-      toast('ok', `Sale ${res.data.invoice_number} saved`); setEdit(null); load();
-    } catch (e) { toast('error', errMsg(e)); } finally { setSaving(false); }
+      if (keepOpen) {
+        // Reload the saved sale (with item ids) so further edits update the same lines.
+        const { data: fresh, error } = await supabase.from('sales').select('*, sale_items(*)').eq('id', saleId).single();
+        if (error) throw error;
+        await load();
+        setEdit({ ...(fresh as Sale), items: ((fresh as Sale).sale_items ?? []).map((i) => ({ ...i })) });
+      } else { toast('ok', `Sale ${res.data.invoice_number} saved`); setEdit(null); load(); }
+      return saleId;
+    } catch (e) { toast('error', errMsg(e)); return null; } finally { setSaving(false); }
+  }
+
+  // ---------- invoice ----------
+  async function invoice(kind: 'preview' | 'download' | 'print' | 'whatsapp' | 'email') {
+    setBusy(kind);
+    try {
+      const id = await save(true); // saves any changes first, so the invoice always matches the sale
+      if (!id) return;
+      const { data, error } = await supabase.from('sales').select('*, sale_items(*)').eq('id', id).single();
+      if (error) throw error;
+      const sale = data as Sale;
+      const items = sale.sale_items ?? [];
+      const cust = sale.customer_id ? (await supabase.from('customers').select('phone,email,address').eq('id', sale.customer_id).maybeSingle()).data : null;
+      const doc = await buildInvoicePdf(sale, items, cust);
+      const blob = doc.output('blob');
+      const file = new File([blob], `${sale.invoice_number}-VANGELUX.pdf`, { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const t = saleTotals(sale, items);
+      const summary = `VANGELUX Invoice ${sale.invoice_number}\nFor: ${sale.customer_name || 'Customer'}\nTotal: ${money(t.total)}${t.balance > 0 && sale.payment_status !== 'refunded' ? `\nBalance due: ${money(t.balance)}` : '\nPaid in full — thank you!'}`;
+      const download = () => { const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); };
+      if (kind === 'preview') setPreviewUrl(url);
+      if (kind === 'download') download();
+      if (kind === 'print') {
+        const w = window.open(url, '_blank');
+        if (!w) download(); else setTimeout(() => { try { w.print(); } catch { /* print from the viewer */ } }, 800);
+      }
+      if (kind === 'whatsapp' || kind === 'email') {
+        if (navigator.canShare?.({ files: [file] })) {
+          try { await navigator.share({ files: [file], title: file.name, text: summary }); }
+          catch (e) { if ((e as Error).name !== 'AbortError') throw e; }
+        } else {
+          download();
+          if (kind === 'whatsapp') window.open(whatsappLink(summary + '\n\n(PDF attached)', toWhatsAppNumber(cust?.phone) || BRAND.whatsappNumber), '_blank');
+          else window.location.href = `mailto:${cust?.email ?? ''}?subject=${encodeURIComponent(`VANGELUX Invoice ${sale.invoice_number}`)}&body=${encodeURIComponent(`Dear ${sale.customer_name || 'Customer'},\n\nPlease find your invoice attached.\n\n${summary}\n\nThank you,\nVANGELUX`)}`;
+          toast('ok', 'PDF downloaded — attach it to your message');
+        }
+      }
+    } catch (e) { toast('error', errMsg(e)); } finally { setBusy(''); }
   }
 
   async function remove(s: Sale) {
@@ -110,7 +159,7 @@ export default function Sales() {
     if (!file) return;
     setImporting(true);
     try {
-      const data = await readRows(file);
+      const data = await readRows(file, /sale/i);
       const groups = new Map<string, Record<string, string>[]>();
       data.forEach((r, i) => { const k = r.invoice_number || r.invoice || `row-${i}`; groups.set(k, [...(groups.get(k) ?? []), r]); });
       let count = 0;
@@ -186,8 +235,17 @@ export default function Sales() {
       <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? `Sale ${edit.invoice_number}` : 'Record sale'} wide
         footer={edit && <>{edit.id && <Button variant="ghost" className="mr-auto text-red-700" onClick={() => remove(edit as Sale)}><Trash2 className="h-4 w-4" /> Delete</Button>}
           <span className="mr-2 text-sm">Total <b>{money(draftTotal)}</b></span>
-          <Button variant="ghost" onClick={() => setEdit(null)}>Cancel</Button><Button variant="gold" loading={saving} onClick={save}>Save sale</Button></>}>
+          <Button variant="ghost" onClick={() => setEdit(null)}>Cancel</Button><Button variant="gold" loading={saving && !busy} onClick={() => save()}>Save sale</Button></>}>
         {edit && <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gold/40 bg-gold/5 p-2">
+            <span className="mr-1 flex items-center gap-1 text-sm font-medium"><FileText className="h-4 w-4" /> Invoice</span>
+            <Button variant="outline" className="py-1.5 text-xs" loading={busy === 'preview'} onClick={() => invoice('preview')}><Eye className="h-4 w-4" /> Preview</Button>
+            <Button variant="outline" className="py-1.5 text-xs" loading={busy === 'download'} onClick={() => invoice('download')}><Download className="h-4 w-4" /> PDF</Button>
+            <Button variant="outline" className="py-1.5 text-xs" loading={busy === 'print'} onClick={() => invoice('print')}><Printer className="h-4 w-4" /></Button>
+            <Button variant="outline" className="py-1.5 text-xs" loading={busy === 'whatsapp'} onClick={() => invoice('whatsapp')}><MessageCircle className="h-4 w-4" /> WhatsApp</Button>
+            <Button variant="outline" className="py-1.5 text-xs" loading={busy === 'email'} onClick={() => invoice('email')}><Mail className="h-4 w-4" /></Button>
+            {!edit.id && <span className="text-[11px] text-neutral-500">The sale is saved first, then the invoice is created.</span>}
+          </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Sale date"><input type="date" className="field" value={edit.sale_date ?? ''} onChange={(e) => setEdit({ ...edit, sale_date: e.target.value })} /></Field>
             <Field label="Invoice number" hint={edit.id ? undefined : 'Leave blank to auto-number'}><input className="field" value={edit.invoice_number ?? ''} onChange={(e) => setEdit({ ...edit, invoice_number: e.target.value })} placeholder="INV-…" /></Field>
@@ -246,6 +304,11 @@ export default function Sales() {
           <Field label="Notes"><textarea className="field" value={edit.notes ?? ''} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></Field>
           <p className="text-xs text-neutral-500">Stock is deducted automatically for each line. Editing a sale adjusts the same deduction; cancelling or returning the order puts the stock back.</p>
         </div>}
+      </Modal>
+
+      <Modal open={!!previewUrl} onClose={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(''); }} title="Invoice preview" wide>
+        <iframe src={previewUrl} title="Invoice preview" className="h-[75vh] w-full rounded-lg border" />
+        <p className="mt-2 text-xs text-neutral-500">If the preview is blank on your phone, use the PDF button to open it.</p>
       </Modal>
     </div>
   );
