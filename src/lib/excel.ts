@@ -7,20 +7,36 @@ export function exportRows(rows: Record<string, unknown>[], filename: string, sh
   XLSX.writeFile(wb, filename, { bookType: filename.endsWith('.csv') ? 'csv' : 'xlsx' });
 }
 
-/** Read the first sheet of an .xlsx/.xls/.csv file into objects keyed by (lower-cased, trimmed) header. */
-export async function readRows(file: File): Promise<Record<string, string>[]> {
+/** "Cost per Item (LKR)" → "cost_per_item", "Invoice number" → "invoice_number". */
+export function headerKey(k: string) {
+  return k.toString().toLowerCase().replace(/\(.*?\)/g, '').trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+const cellText = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '').trim());
+
+/**
+ * Reads a sheet of an .xlsx/.xls/.csv file into objects keyed by tidied header (see headerKey).
+ * - `preferSheet`: use the first sheet whose name matches (e.g. /expense/i), otherwise the first sheet.
+ * - The header row is found automatically: the first row (within the top 15) that contains a "date"
+ *   column and at least two filled cells. Notes or titles above the table are skipped.
+ * - Completely empty rows are dropped.
+ */
+export async function readRows(file: File, preferSheet?: RegExp): Promise<Record<string, string>[]> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
-  return raw.map((r) => {
-    const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(r)) {
-      const key = k.toString().trim().toLowerCase().replace(/\s+/g, '_');
-      out[key] = v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '').trim();
-    }
-    return out;
-  });
+  const name = (preferSheet && wb.SheetNames.find((n) => preferSheet.test(n))) || wb.SheetNames[0];
+  const ws = wb.Sheets[name];
+  const grid = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '', blankrows: false });
+  let h = grid.slice(0, 15).findIndex((r) => r.some((c) => /\bdate\b/i.test(cellText(c))) && r.filter((c) => cellText(c)).length >= 2);
+  if (h < 0) h = 0;
+  const headers = (grid[h] ?? []).map((c) => headerKey(cellText(c)));
+  return grid.slice(h + 1)
+    .filter((r) => r.some((c) => cellText(c)))
+    .map((r) => {
+      const out: Record<string, string> = {};
+      headers.forEach((k, i) => { if (k) out[k] = cellText(r[i]); });
+      return out;
+    });
 }
 
 /** Accepts 2026-11-22, 22/11/2026, 22-11-2026 or an Excel serial number. */
@@ -32,4 +48,6 @@ export function parseDate(v: string): string | null {
   if (/^\d{5}$/.test(v)) { const d = XLSX.SSF.parse_date_code(Number(v)); return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`; }
   return null;
 }
-export const toNum = (v: string) => Number(String(v).replace(/[^0-9.-]/g, '')) || 0;
+
+/** "Rs. 2,000.00", "LKR 1,500", "2000" → number. */
+export const toNum = (v: string) => Number(String(v ?? '').replace(/rs\.?|lkr/gi, '').replace(/[^0-9.-]/g, '')) || 0;
