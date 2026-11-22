@@ -42,7 +42,13 @@ export interface Quotation {
 export interface SaleItem {
   id?: string; sale_id?: string; product_id: string | null; description: string; size: string | null; color: string | null;
   quantity: number; unit_price: number; discount_amount: number; unit_cost?: number; line_total?: number;
+  /** How many come from stock in hand (null = let the app decide). The rest is to order. */
+  from_stock?: number | null;
+  supply_status?: SupplyStatus;
 }
+export type SupplyStatus = 'none' | 'to_order' | 'ordered' | 'received';
+/** Orders still being worked on (not yet handed over). */
+export const OPEN_ORDER_STATUSES = ['pending', 'confirmed', 'processing'];
 export interface Sale {
   id: string; invoice_number: string; sale_date: string; customer_id: string | null; customer_name: string | null;
   discount_amount: number; delivery_fee: number; amount_paid: number; payment_method: string; payment_status: string;

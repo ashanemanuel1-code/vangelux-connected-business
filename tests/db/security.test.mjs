@@ -127,11 +127,36 @@ await db.query(`update sales set order_status='cancelled' where id=$1`, [sale.id
 ok(await stock() === 20, 'cancelling the sale restores stock');
 await db.query(`update sales set order_status='confirmed' where id=$1`, [sale.id]);
 ok(await stock() === 16, 're-confirming deducts again once');
-// concept products never count as stock
+// inventory is separate from the catalogue: any product (even a concept design) can hold stock
 await db.query(`update products set is_concept = true where id=$1`, [p2]);
-await db.query(`insert into inventory_movements (product_id,movement_type,quantity) values ($1,'initial',50)`, [p2]);
-const conceptStock = (await db.query(`select count(*)::int n from stock_levels where product_id=$1`, [p2])).rows[0].n;
-ok(conceptStock === 0, 'concept/mockup product excluded from stock levels');
+await db.query(`insert into inventory_movements (product_id,movement_type,quantity) values ($1,'initial',5)`, [p2]);
+const conceptStock = (await db.query(`select quantity from stock_levels where product_id=$1`, [p2])).rows[0]?.quantity;
+ok(conceptStock === 5, 'concept design can hold stock recorded in Inventory');
+
+console.log('\n== From stock or to order (pre-orders) ==');
+await db.query(`insert into inventory_movements (product_id,size,color,movement_type,quantity) values ($1,'S','Black','addition',2)`, [p1]);
+const stockS = async () => Number((await db.query(`select quantity from stock_levels where product_id=$1 and size='S'`, [p1])).rows[0]?.quantity ?? 0);
+const pre = (await db.query(`insert into sales (customer_name) values ('Pre-order customer') returning id`)).rows[0];
+const pl = (await db.query(`insert into sale_items (sale_id, product_id, description, size, color, quantity, unit_price) values ($1,$2,'GC Tee','S','Black',5,4900) returning id, from_stock, supply_status`, [pre.id, p1])).rows[0];
+ok(pl.from_stock === 2 && pl.supply_status === 'to_order', 'order of 5 with 2 in hand → 2 from stock, 3 to order');
+ok(await stockS() === 0, 'only the 2 in hand are deducted (stock never goes negative)');
+let row = (await db.query(`update sale_items set quantity = 1 where id=$1 returning from_stock, supply_status`, [pl.id])).rows[0];
+ok(row.from_stock === 1 && row.supply_status === 'none', 'qty changed to 1 → fully from stock, nothing to order');
+ok(await stockS() === 1, 'stock corrected to 1 after editing the line');
+row = (await db.query(`update sale_items set from_stock = 0 where id=$1 returning from_stock, supply_status`, [pl.id])).rows[0];
+ok(row.from_stock === 0 && row.supply_status === 'to_order' && await stockS() === 2, 'manual choice "make it to order" keeps stock at 2');
+await db.query(`update sale_items set supply_status = 'ordered' where id=$1`, [pl.id]);
+row = (await db.query(`update sale_items set unit_price = 5000 where id=$1 returning from_stock, supply_status`, [pl.id])).rows[0];
+ok(row.from_stock === 0 && row.supply_status === 'ordered', 'editing the price keeps the stock choice and "ordered" status');
+const custom = (await db.query(`insert into sale_items (sale_id, description, quantity, unit_price) values ($1,'Custom church tee',10,3000) returning from_stock, supply_status`, [pre.id])).rows[0];
+ok(custom.from_stock === 0 && custom.supply_status === 'to_order', 'custom item (no product) is always to order');
+const conceptLine = (await db.query(`insert into sale_items (sale_id, product_id, description, quantity, unit_price) values ($1,$2,'Concept',2,8000) returning from_stock`, [pre.id, p2])).rows[0];
+ok(conceptLine.from_stock === 2, 'concept design with stock in hand is taken from stock');
+await asAnon();
+await expectError(`select from_stock from public.sale_items limit 1`, 'anon cannot see stock allocation');
+await asUser(OWNER);
+await db.query(`delete from sales where id=$1`, [pre.id]);
+ok(await stockS() === 2, 'deleting the order puts stock back');
 
 console.log('\n== Quotation → order ==');
 const q = (await db.query(`insert into quotations (customer_name, customer_phone, delivery_fee) values ('Nimal','0771234567',500) returning id, quote_number`)).rows[0];

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Boxes, AlertTriangle, Plus, Download } from 'lucide-react';
+import { Boxes, AlertTriangle, Plus, Download, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { fmtDate, label } from '../lib/format';
+import { fmtDate, label, num } from '../lib/format';
 import { exportRows } from '../lib/excel';
 import { useLiveRefresh } from '../lib/useRealtime';
 import { MOVEMENT_TYPES, type InventoryMovement, type StockLevel } from '../lib/types';
@@ -19,6 +19,8 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<{ product_id: string; size: string; color: string; type: string; qty: number; note: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [bulk, setBulk] = useState<{ product_id: string; qty: Record<string, number>; note: string } | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const productFilter = params.get('product') ?? '';
 
   const load = useCallback(async () => {
@@ -32,10 +34,12 @@ export default function Inventory() {
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(['inventory_movements', 'products'], load);
 
-  const physical = products.filter((p) => !p.is_concept);
+  // Inventory is separate from the catalogue: any product can hold stock.
+  const physical = products;
   const low = useMemo(() => stock.filter((s) => { const p = physical.find((x) => x.id === s.product_id); return p && s.quantity <= p.low_stock_threshold; }), [stock, physical]);
   const pName = (id: string) => products.find((p) => p.id === id)?.name ?? '(deleted product)';
-  const shown = physical.filter((p) => !productFilter || p.id === productFilter);
+  const hasStock = (id: string) => stock.some((s) => s.product_id === id && s.quantity !== 0);
+  const shown = physical.filter((p) => (productFilter ? p.id === productFilter : showAll || hasStock(p.id)));
 
   function openForm(product_id = productFilter || physical[0]?.id || '') {
     const p = products.find((x) => x.id === product_id);
@@ -54,13 +58,30 @@ export default function Inventory() {
   }
 
   const fp = products.find((p) => p.id === form?.product_id);
+  const bp = products.find((p) => p.id === bulk?.product_id);
+  const combos = (p?: P) => (p ? (p.sizes.length ? p.sizes : ['']).flatMap((sz) => (p.colors.length ? p.colors : ['']).map((c) => ({ size: sz, color: c, key: `${sz}|${c}` }))) : []);
+
+  async function saveBulk() {
+    if (!bulk?.product_id) return toast('error', 'Choose a product');
+    const rows = Object.entries(bulk.qty).filter(([, q]) => num(q) > 0).map(([k, q]) => {
+      const [size, color] = k.split('|');
+      return { product_id: bulk.product_id, size, color, movement_type: 'addition', quantity: Math.round(num(q)), note: bulk.note || 'Stock in hand' };
+    });
+    if (!rows.length) return toast('error', 'Enter at least one quantity');
+    setSaving(true);
+    const { error } = await supabase.from('inventory_movements').insert(rows);
+    setSaving(false);
+    if (error) return toast('error', errMsg(error));
+    toast('ok', `Added ${rows.reduce((a, r) => a + r.quantity, 0)} pieces to stock`); setBulk(null); load();
+  }
 
   return (
     <div>
-      <PageHeader title="Inventory" subtitle="Stock by product, size and colour. Sales deduct automatically; concept designs are never counted."
+      <PageHeader title="Inventory" subtitle="What you have in hand, by design, size and colour. Orders use this stock first; anything missing goes on the To order list. Customers never see stock."
         actions={<>
           <Button variant="outline" onClick={() => exportRows(stock.map((s) => ({ Product: pName(s.product_id), Size: s.size, Colour: s.color, Quantity: s.quantity })), 'vangelux-stock.xlsx', 'Stock')}><Download className="h-4 w-4" /> Export</Button>
-          <Button variant="gold" onClick={() => openForm()} disabled={!physical.length}><Plus className="h-4 w-4" /> Stock movement</Button></>} />
+          <Button variant="outline" onClick={() => openForm()} disabled={!physical.length}><SlidersHorizontal className="h-4 w-4" /> Adjust</Button>
+          <Button variant="gold" onClick={() => setBulk({ product_id: productFilter || physical[0]?.id || '', qty: {}, note: '' })} disabled={!physical.length}><Plus className="h-4 w-4" /> Add stock</Button></>} />
 
       {low.length > 0 && (
         <Card className="mb-4 border-amber-300 bg-amber-50">
@@ -69,13 +90,15 @@ export default function Inventory() {
         </Card>
       )}
 
-      <div className="mb-3 flex gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <select className="field max-w-sm" value={productFilter} onChange={(e) => setParams(e.target.value ? { product: e.target.value } : {})}>
-          <option value="">All products</option>{physical.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          <option value="">{showAll ? 'All designs' : 'Designs with stock'}</option>{physical.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+        {!productFilter && <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-gold" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show designs with no stock</label>}
       </div>
 
-      {loading ? <Spinner /> : shown.length === 0 ? <Empty icon={<Boxes className="h-10 w-10" />} title="No physical products yet" /> : (
+      {loading ? <Spinner /> : physical.length === 0 ? <Empty icon={<Boxes className="h-10 w-10" />} title="Add your designs in Products first" text="Then come back here and add the stock you have in hand." />
+        : shown.length === 0 ? <Empty icon={<Boxes className="h-10 w-10" />} title="No stock in hand yet" text="Tap “Add stock” to record what you already have. Designs without stock are taken as pre-orders." /> : (
         <div className="grid gap-3 md:grid-cols-2">
           {shown.map((p) => {
             const rows = stock.filter((s) => s.product_id === p.id);
@@ -89,7 +112,10 @@ export default function Inventory() {
                     <span key={s.size + s.color} className={`rounded-lg border px-2 py-1 text-xs ${s.quantity <= p.low_stock_threshold ? 'border-red-300 bg-red-50 text-red-800' : 'border-neutral-200'}`}>{[s.size || 'One size', s.color].filter(Boolean).join(' · ')}: <b>{s.quantity}</b></span>
                   ))}</div>
                 )}
-                <button className="mt-3 text-sm font-semibold text-gold-dark" onClick={() => openForm(p.id)}>+ Add / adjust</button>
+                <div className="mt-3 flex gap-4 text-sm font-semibold text-gold-dark">
+                  <button onClick={() => setBulk({ product_id: p.id, qty: {}, note: '' })}>+ Add stock</button>
+                  <button onClick={() => openForm(p.id)}>Adjust</button>
+                </div>
               </Card>
             );
           })}
@@ -107,7 +133,33 @@ export default function Inventory() {
         </table>
       </Card>
 
-      <Modal open={!!form} onClose={() => setForm(null)} title="Stock movement"
+      <Modal open={!!bulk} onClose={() => setBulk(null)} title="Add stock in hand"
+        footer={<><Button variant="ghost" onClick={() => setBulk(null)}>Cancel</Button><Button variant="gold" loading={saving} onClick={saveBulk}>Add to stock</Button></>}>
+        {bulk && <div className="space-y-3">
+          <Field label="Design"><select className="field" value={bulk.product_id} onChange={(e) => setBulk({ ...bulk, product_id: e.target.value, qty: {} })}>
+            {physical.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}</select></Field>
+          <div>
+            <p className="field-label">How many do you have? <span className="font-normal text-neutral-500">(leave blank for none)</span></p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {combos(bp).map((c) => {
+                const now = stock.find((s) => s.product_id === bulk.product_id && s.size === c.size && s.color === c.color)?.quantity ?? 0;
+                return (
+                  <label key={c.key} className="rounded-xl border border-neutral-200 p-2 text-sm">
+                    <span className="block font-medium">{[c.size || 'One size', c.color].filter(Boolean).join(' · ')}</span>
+                    <span className="block text-[11px] text-neutral-500">now {now}</span>
+                    <input type="number" min={0} inputMode="numeric" className="field mt-1 py-1.5" placeholder="0" value={bulk.qty[c.key] || ''}
+                      onChange={(e) => setBulk({ ...bulk, qty: { ...bulk.qty, [c.key]: Number(e.target.value) } })} />
+                  </label>
+                );
+              })}
+            </div>
+            {bp && !bp.sizes.length && !bp.colors.length && <p className="mt-2 text-xs text-neutral-500">Tip: add sizes and colours to this design in Products to record stock per size.</p>}
+          </div>
+          <Field label="Note (optional)"><input className="field" value={bulk.note} onChange={(e) => setBulk({ ...bulk, note: e.target.value })} placeholder="e.g. Stock in hand, Batch 2 from printer" /></Field>
+        </div>}
+      </Modal>
+
+      <Modal open={!!form} onClose={() => setForm(null)} title="Adjust stock"
         footer={<><Button variant="ghost" onClick={() => setForm(null)}>Cancel</Button><Button variant="gold" loading={saving} onClick={save}>Save</Button></>}>
         {form && <div className="space-y-3">
           <Field label="Product"><select className="field" value={form.product_id} onChange={(e) => { const p = products.find((x) => x.id === e.target.value); setForm({ ...form, product_id: e.target.value, size: p?.sizes[0] ?? '', color: p?.colors[0] ?? '' }); }}>

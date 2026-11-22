@@ -92,7 +92,7 @@ export default function Products() {
                   <p className="text-xs text-neutral-500">{p.sku} · {nameOf(lk.categories, p.category_id) || 'No category'}</p>
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-sm font-semibold">{money(p.selling_price)}</span>
-                    <span className={`text-xs ${!p.is_concept && qty <= p.low_stock_threshold ? 'font-semibold text-red-700' : 'text-neutral-500'}`}>{p.is_concept ? '—' : `${qty} in stock`}</span>
+                    <span className={`text-xs ${qty > 0 && qty <= p.low_stock_threshold ? 'font-semibold text-red-700' : 'text-neutral-500'}`}>{qty > 0 ? `${qty} in stock` : 'made to order'}</span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {p.product_tags?.slice(0, 3).map((t) => { const tag = lk.tags.find((x) => x.id === t.tag_id); return tag ? <Badge key={t.tag_id} color={tag.color}>{tag.name}</Badge> : null; })}

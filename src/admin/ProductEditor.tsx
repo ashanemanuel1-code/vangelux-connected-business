@@ -35,7 +35,6 @@ export default function ProductEditor() {
   const [images, setImages] = useState<EditImage[]>([]);
   const [removedPaths, setRemovedPaths] = useState<string[]>([]);
   const [removedIds, setRemovedIds] = useState<string[]>([]);
-  const [initialStock, setInitialStock] = useState<Record<string, number>>({});
   const [stock, setStock] = useState<StockLevel[]>([]);
   const [newColor, setNewColor] = useState('');
   const [customSize, setCustomSize] = useState('');
@@ -213,15 +212,6 @@ export default function ProductEditor() {
       }
       if (removedPaths.length) await deleteMedia([...new Set(removedPaths)]);
 
-      // initial stock (new products only)
-      if (isNew && !f.is_concept) {
-        const mv = Object.entries(initialStock).filter(([, q]) => num(q) > 0).map(([k, q]) => {
-          const [size, color] = k.split('|');
-          return { product_id: productId, size, color, movement_type: 'initial', quantity: num(q), note: 'Initial stock' };
-        });
-        if (mv.length) { const { error } = await supabase.from('inventory_movements').insert(mv); if (error) throw error; }
-      }
-
       toast('ok', status === 'published' ? 'Saved — live on the public showroom' : 'Product saved');
       nav('/admin/products');
     } catch (e) {
@@ -247,8 +237,6 @@ export default function ProductEditor() {
   const front = images.find((i) => i.kind === 'front');
   const back = images.find((i) => i.kind === 'back');
   const details = images.filter((i) => i.kind === 'detail');
-  const sizesForStock = f.sizes.length ? f.sizes : [''];
-  const colorsForStock = f.colors.length ? f.colors : [''];
 
   return (
     <div className="pb-20">
@@ -390,7 +378,7 @@ export default function ProductEditor() {
           </div>
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" className="mt-1 accent-gold" checked={f.is_concept} onChange={(e) => set('is_concept', e.target.checked)} />
-            <span><b>Concept / mockup design</b> — not physical stock. Never counted in inventory.</span>
+            <span><b>Concept / mockup design</b> — shows a “concept” label in your product list. Stock is handled separately in Inventory.</span>
           </label>
         </Card>
 
@@ -428,35 +416,20 @@ export default function ProductEditor() {
         {/* ---------------- stock ---------------- */}
         <Card className="lg:col-span-2">
           <h2 className="mb-3 font-semibold">Stock</h2>
-          {f.is_concept ? <p className="text-sm text-neutral-500">Concept designs are not tracked as physical stock.</p>
-            : isNew ? (
-              <>
-                <p className="mb-2 text-xs text-neutral-500">Initial quantity per size & colour (optional).</p>
-                <div className="space-y-1.5">
-                  {sizesForStock.flatMap((s) => colorsForStock.map((c) => {
-                    const k = `${s}|${c}`;
-                    return (
-                      <div key={k} className="flex items-center justify-between gap-2 text-sm">
-                        <span>{[s || 'One size', c].filter(Boolean).join(' · ')}</span>
-                        <input type="number" min={0} className="field w-24 py-1.5" value={initialStock[k] || ''} onChange={(e) => setInitialStock((x) => ({ ...x, [k]: Number(e.target.value) }))} />
-                      </div>
-                    );
-                  }))}
-                </div>
-              </>
-            ) : (
-              <>
-                {stock.length === 0 ? <p className="text-sm text-neutral-500">No stock recorded yet.</p> : (
-                  <table className="w-full text-sm"><tbody>
-                    {stock.map((s) => (
-                      <tr key={s.size + s.color} className="border-b border-neutral-100"><td className="py-1.5">{[s.size || 'One size', s.color].filter(Boolean).join(' · ')}</td>
-                        <td className={`text-right font-semibold ${s.quantity <= f.low_stock_threshold ? 'text-red-700' : ''}`}>{s.quantity}</td></tr>
-                    ))}
-                  </tbody></table>
-                )}
-                <Link to={`/admin/inventory?product=${productId}`} className="mt-3 inline-block text-sm font-semibold text-gold-dark hover:underline">Add / adjust stock →</Link>
-              </>
-            )}
+          <p className="mb-3 text-xs text-neutral-500">Products are your catalogue. What you have in hand is recorded in <b>Inventory</b>; orders use it first and the rest goes on the <b>To order</b> list.</p>
+          {isNew ? <p className="text-sm text-neutral-500">Save the product, then add the stock you have in Inventory.</p> : (
+            <>
+              {stock.length === 0 ? <p className="text-sm text-neutral-500">No stock in hand — orders for this design are made to order.</p> : (
+                <table className="w-full text-sm"><tbody>
+                  {stock.map((s) => (
+                    <tr key={s.size + s.color} className="border-b border-neutral-100"><td className="py-1.5">{[s.size || 'One size', s.color].filter(Boolean).join(' · ')}</td>
+                      <td className={`text-right font-semibold ${s.quantity <= f.low_stock_threshold ? 'text-red-700' : ''}`}>{s.quantity}</td></tr>
+                  ))}
+                </tbody></table>
+              )}
+              <Link to={`/admin/inventory?product=${productId}`} className="mt-3 inline-block text-sm font-semibold text-gold-dark hover:underline">Add / adjust stock in Inventory →</Link>
+            </>
+          )}
         </Card>
       </div>
 

@@ -56,14 +56,28 @@ export default function Sales() {
   }), [valid]);
 
   // ---------- editor helpers ----------
-  const setItem = (idx: number, patch: Partial<SaleItem>) => setEdit((e) => e && ({ ...e, items: e.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) }));
+  const setItem = (idx: number, patch: Partial<SaleItem>) => setEdit((e) => e && ({ ...e, items: e.items.map((it, i) => {
+    if (i !== idx) return it;
+    // Changing what is sold lets the app re-check stock (unless the stock number itself is being set).
+    const reAllocate = !('from_stock' in patch) && ['product_id', 'size', 'color', 'quantity'].some((k) => k in patch);
+    return { ...it, ...patch, ...(reAllocate ? { from_stock: null } : {}) };
+  }) }));
   function pickProduct(idx: number, pid: string) {
     const p = products.find((x) => x.id === pid);
     if (!p) return setItem(idx, { product_id: null });
     setItem(idx, { product_id: p.id, description: p.name, size: p.sizes[0] ?? '', color: p.colors[0] ?? '', unit_price: Math.round(num(p.selling_price) * (1 - num(p.discount_percent) / 100) * 100) / 100 });
   }
   const draftTotal = edit ? edit.items.reduce((a, i) => a + num(i.quantity) * num(i.unit_price) - num(i.discount_amount), 0) - num(edit.discount_amount) + num(edit.delivery_fee) : 0;
-  const available = (it: SaleItem) => stock.find((s) => s.product_id === it.product_id && s.size === (it.size ?? '') && s.color === (it.color ?? ''))?.quantity ?? 0;
+  const inHand = (it: SaleItem) => stock.find((s) => s.product_id === it.product_id && s.size === (it.size ?? '') && s.color === (it.color ?? ''))?.quantity ?? 0;
+  /** Stock this line may use: what's in hand + what this same line already took (when editing). */
+  const available = (it: SaleItem) => {
+    const orig = it.id ? rows.find((r) => r.id === edit?.id)?.sale_items?.find((x) => x.id === it.id) : undefined;
+    const origOrder = rows.find((r) => r.id === edit?.id);
+    const own = orig && origOrder && !['cancelled', 'returned'].includes(origOrder.order_status) && orig.product_id === it.product_id && (orig.size ?? '') === (it.size ?? '') && (orig.color ?? '') === (it.color ?? '') ? num(orig.from_stock) : 0;
+    return Math.max(0, inHand(it) + own);
+  };
+  /** How many of this line come from stock (preview of what will be saved). */
+  const fromStock = (it: SaleItem) => !it.product_id ? 0 : Math.min(Math.max(1, num(it.quantity)), it.from_stock ?? available(it));
 
   async function save(keepOpen = false): Promise<string | null> {
     if (!edit) return null;
@@ -95,7 +109,7 @@ export default function Sales() {
       const toDelete = before.filter((b) => !keepIds.includes(b.id!)).map((b) => b.id!);
       if (toDelete.length) { const { error } = await supabase.from('sale_items').delete().in('id', toDelete); if (error) throw error; }
       for (const it of items) {
-        const row = { sale_id: saleId, product_id: it.product_id || null, description: it.description.trim() || 'Item', size: it.size || null, color: it.color || null, quantity: Math.max(1, num(it.quantity)), unit_price: num(it.unit_price), discount_amount: num(it.discount_amount) };
+        const row = { sale_id: saleId, product_id: it.product_id || null, description: it.description.trim() || 'Item', size: it.size || null, color: it.color || null, quantity: Math.max(1, num(it.quantity)), unit_price: num(it.unit_price), discount_amount: num(it.discount_amount), from_stock: it.from_stock ?? null };
         const { error } = it.id ? await supabase.from('sale_items').update(row).eq('id', it.id) : await supabase.from('sale_items').insert(row);
         if (error) throw error;
       }
@@ -179,7 +193,9 @@ export default function Sales() {
         const items = lines.map((l) => {
           const p = products.find((x) => x.sku.toLowerCase() === (l.sku || '').toLowerCase()) ?? products.find((x) => x.name.toLowerCase() === (l.product || '').toLowerCase());
           return { sale_id: s.id, product_id: p?.id ?? null, description: p?.name ?? (l.product || 'Item'), size: l.size || null, color: l.colour || l.color || null,
-            quantity: Math.max(1, toNum(l.quantity || '1')), unit_price: toNum(l.unit_price || l.selling_price || l.price || '0'), discount_amount: toNum(l.discount || '0') };
+            quantity: Math.max(1, toNum(l.quantity || '1')), unit_price: toNum(l.unit_price || l.selling_price || l.price || '0'), discount_amount: toNum(l.discount || '0'),
+            // Past orders that were already handed over don't touch the stock you have now.
+            ...(['completed', 'delivered', 'shipped'].includes(sale.order_status) ? { from_stock: 0, supply_status: 'received' } : {}) };
         });
         const { error: ie } = await supabase.from('sale_items').insert(items);
         if (ie) throw ie;
@@ -224,7 +240,7 @@ export default function Sales() {
               <button key={s.id} onClick={() => setEdit({ ...s, items: (s.sale_items ?? []).map((i) => ({ ...i })) })} className="flex w-full flex-wrap items-center gap-3 p-3 text-left hover:bg-neutral-50 sm:p-4">
                 <div className="min-w-48 flex-1"><p className="font-medium">{s.customer_name || 'Customer'} <span className="text-xs text-neutral-400">{s.invoice_number}</span></p>
                   <p className="text-xs text-neutral-500">{fmtDate(s.sale_date)} · {(s.sale_items ?? []).map((i) => `${i.quantity}× ${i.description}${i.size ? ` ${i.size}` : ''}`).join(', ')}</p></div>
-                <div className="flex items-center gap-1.5"><Badge tone={s.order_status}>{label(s.order_status)}</Badge><Badge tone={s.payment_status}>{s.payment_status}</Badge></div>
+                <div className="flex items-center gap-1.5">{(() => { const n = (s.sale_items ?? []).filter((i) => i.supply_status === 'to_order' || i.supply_status === 'ordered').reduce((a, i) => a + i.quantity - num(i.from_stock), 0); return n > 0 && !['cancelled', 'returned'].includes(s.order_status) ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">{n} to order</span> : null; })()}<Badge tone={s.order_status}>{label(s.order_status)}</Badge><Badge tone={s.payment_status}>{s.payment_status}</Badge></div>
                 <div className="w-28 text-right"><b>{money(t)}</b>{due > 0 && s.payment_status !== 'refunded' && <p className="text-[11px] text-red-700">due {money(due)}</p>}</div>
               </button>
             );
@@ -268,7 +284,8 @@ export default function Sales() {
             <div className="space-y-2">
               {edit.items.map((it, idx) => {
                 const p = products.find((x) => x.id === it.product_id);
-                const avail = it.product_id && !p?.is_concept ? available(it) : null;
+                const fs = fromStock(it);
+                const toOrder = Math.max(1, num(it.quantity)) - fs;
                 return (
                   <div key={it.id ?? idx} className="grid grid-cols-2 gap-2 rounded-xl border border-neutral-200 bg-white p-2 sm:grid-cols-12">
                     <select className="field col-span-2 sm:col-span-4" value={it.product_id ?? ''} onChange={(e) => pickProduct(idx, e.target.value)}>
@@ -281,7 +298,15 @@ export default function Sales() {
                     <Field label="Unit price" className="sm:col-span-2"><input type="number" className="field" value={it.unit_price || ''} onChange={(e) => setItem(idx, { unit_price: Number(e.target.value) })} /></Field>
                     <Field label="Discount" className="sm:col-span-2"><input type="number" className="field" value={it.discount_amount || ''} onChange={(e) => setItem(idx, { discount_amount: Number(e.target.value) })} /></Field>
                     <div className="col-span-2 flex items-end justify-between gap-2 sm:col-span-12">
-                      <span className="text-xs text-neutral-500">{avail !== null && <>In stock: <b className={avail < it.quantity ? 'text-red-700' : ''}>{avail}</b></>}</span>
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-600">
+                        {it.product_id && <span>In hand: <b>{available(it)}</b></span>}
+                        {it.product_id && <label className="flex items-center gap-1">From stock
+                          <input type="number" min={0} max={Math.min(num(it.quantity), available(it))} className="field w-16 px-2 py-1 text-xs" value={fs}
+                            onChange={(e) => setItem(idx, { from_stock: Math.max(0, Math.min(Number(e.target.value), num(it.quantity), available(it))) })} /></label>}
+                        {toOrder > 0
+                          ? <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">{toOrder} to order{it.supply_status && it.supply_status !== 'none' && it.supply_status !== 'to_order' ? ` · ${it.supply_status}` : ''}</span>
+                          : <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">all from stock</span>}
+                      </span>
                       <span className="text-sm">Line: <b>{money(num(it.quantity) * num(it.unit_price) - num(it.discount_amount))}</b></span>
                       <button onClick={() => setEdit({ ...edit, items: edit.items.filter((_, i) => i !== idx) })} className="rounded p-1 text-red-700 hover:bg-red-50"><X className="h-4 w-4" /></button>
                     </div>
@@ -302,7 +327,7 @@ export default function Sales() {
             <Field label="Order status"><select className="field" value={edit.order_status} onChange={(e) => setEdit({ ...edit, order_status: e.target.value })}>{ORDER_STATUSES.map((m) => <option key={m} value={m}>{label(m)}</option>)}</select></Field>
           </div>
           <Field label="Notes"><textarea className="field" value={edit.notes ?? ''} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></Field>
-          <p className="text-xs text-neutral-500">Stock is deducted automatically for each line. Editing a sale adjusts the same deduction; cancelling or returning the order puts the stock back.</p>
+          <p className="text-xs text-neutral-500">The app takes what you have in hand first; the rest goes on the <b>To order</b> list. Only the “from stock” part is deducted. Cancelling or returning the order puts the stock back.</p>
         </div>}
       </Modal>
 

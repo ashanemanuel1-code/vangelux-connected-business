@@ -20,6 +20,7 @@ const QuotationEditor = lazy(() => import('./admin/QuotationEditor'));
 const Sales = lazy(() => import('./admin/Sales'));
 const Expenses = lazy(() => import('./admin/Expenses'));
 const Inventory = lazy(() => import('./admin/Inventory'));
+const ToOrder = lazy(() => import('./admin/ToOrder'));
 const Customers = lazy(() => import('./admin/Customers'));
 const Settings = lazy(() => import('./admin/Settings'));
 
@@ -63,6 +64,7 @@ export default function App() {
                 <Route path="sales" element={<Sales />} />
                 <Route path="expenses" element={<Expenses />} />
                 <Route path="inventory" element={<Inventory />} />
+                <Route path="to-order" element={<ToOrder />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="settings" element={<Settings />} />
               </Route>

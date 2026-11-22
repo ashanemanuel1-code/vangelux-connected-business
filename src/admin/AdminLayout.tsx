@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
 import {
   LayoutDashboard, Shirt, Layers, FileText, ShoppingBag, Receipt, Boxes, Users, Settings as SettingsIcon,
-  LogOut, Menu, X, ExternalLink,
+  LogOut, Menu, X, ExternalLink, ClipboardList,
 } from 'lucide-react';
+import { useFulfilment } from '../lib/fulfilment';
 import { useAuth } from '../auth/AuthProvider';
 import { asset } from '../lib/brand';
 
@@ -13,21 +14,30 @@ const nav = [
   { to: '/admin/collections', label: 'Collections', icon: Layers },
   { to: '/admin/quotations', label: 'Quotations', icon: FileText },
   { to: '/admin/sales', label: 'Sales', icon: ShoppingBag },
+  { to: '/admin/to-order', label: 'To order', icon: ClipboardList },
   { to: '/admin/expenses', label: 'Expenses', icon: Receipt },
   { to: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { to: '/admin/customers', label: 'Customers', icon: Users },
   { to: '/admin/settings', label: 'Settings & Tags', icon: SettingsIcon },
 ];
-const mobileNav = [nav[0], nav[1], nav[3], nav[4]];
+const mobileNav = [nav[0], nav[3], nav[4], nav[5]]; // Dashboard, Quotations, Sales, To order
 
 export default function AdminLayout() {
   const { staff, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+  const fl = useFulfilment();
+  // Menu badges: amber = pieces you need to order, green = orders ready to hand over.
+  const badge = (to: string) => to !== '/admin/to-order' ? null : (
+    <span className="ml-auto flex gap-1">
+      {fl.piecesToOrder > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold leading-4 text-ink">{fl.piecesToOrder}</span>}
+      {fl.ready.length > 0 && <span className="rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold leading-4 text-ink">{fl.ready.length}</span>}
+    </span>
+  );
 
   const links = (onClick?: () => void) => nav.map(({ to, label, icon: Icon, end }) => (
     <NavLink key={to} to={to} end={end} onClick={onClick}
       className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${isActive ? 'bg-gold/15 text-gold' : 'text-neutral-300 hover:bg-white/5 hover:text-ivory'}`}>
-      <Icon className="h-4.5 w-4.5" /> {label}
+      <Icon className="h-4.5 w-4.5" /> {label}{badge(to)}
     </NavLink>
   ));
 
@@ -71,7 +81,7 @@ export default function AdminLayout() {
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-white/10 bg-ink lg:hidden">
         {mobileNav.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className={({ isActive }) => `flex flex-col items-center gap-1 py-2.5 text-[10px] ${isActive ? 'text-gold' : 'text-neutral-400'}`}>
-            <Icon className="h-5 w-5" />{label}
+            <span className="relative"><Icon className="h-5 w-5" />{to === '/admin/to-order' && fl.piecesToOrder + fl.ready.length > 0 && <span className="absolute -right-2 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500" />}</span>{label}
           </NavLink>
         ))}
         <button onClick={() => setOpen(true)} className="flex flex-col items-center gap-1 py-2.5 text-[10px] text-neutral-400"><Menu className="h-5 w-5" />More</button>
