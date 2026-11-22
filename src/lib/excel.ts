@@ -12,7 +12,12 @@ export function headerKey(k: string) {
   return k.toString().toLowerCase().replace(/\(.*?\)/g, '').trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
-const cellText = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '').trim());
+/** Excel dates → YYYY-MM-DD in the user's own calendar (toISOString would shift the day in Sri Lanka's UTC+5:30). */
+function dateOnly(d: Date) {
+  const x = new Date(d.getTime() + 12 * 3600 * 1000); // centre on the day, so tiny Excel time offsets can't change it
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+}
+const cellText = (v: unknown) => (v instanceof Date ? dateOnly(v) : String(v ?? '').trim());
 
 /**
  * Reads a sheet of an .xlsx/.xls/.csv file into objects keyed by tidied header (see headerKey).
