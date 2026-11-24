@@ -3,7 +3,7 @@ import { NavLink, Outlet, Link } from 'react-router-dom';
 import { isNativeApp } from '../lib/native';
 import {
   LayoutDashboard, Shirt, Layers, FileText, ShoppingBag, Receipt, Boxes, Users, Settings as SettingsIcon,
-  LogOut, Menu, X, ExternalLink, ClipboardList,
+  LogOut, Menu, X, ExternalLink, ClipboardList, Ruler,
 } from 'lucide-react';
 import { useFulfilment } from '../lib/fulfilment';
 import { useAuth } from '../auth/AuthProvider';
@@ -13,6 +13,7 @@ const nav = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/products', label: 'Products', icon: Shirt },
   { to: '/admin/collections', label: 'Collections', icon: Layers },
+  { to: '/admin/size-charts', label: 'Size charts', icon: Ruler },
   { to: '/admin/quotations', label: 'Quotations', icon: FileText },
   { to: '/admin/sales', label: 'Sales', icon: ShoppingBag },
   { to: '/admin/to-order', label: 'To order', icon: ClipboardList },
@@ -21,7 +22,7 @@ const nav = [
   { to: '/admin/customers', label: 'Customers', icon: Users },
   { to: '/admin/settings', label: 'Settings & Tags', icon: SettingsIcon },
 ];
-const mobileNav = [nav[0], nav[3], nav[4], nav[5]]; // Dashboard, Quotations, Sales, To order
+const mobileNav = [nav[0], nav[4], nav[5], nav[6]]; // Dashboard, Quotations, Sales, To order
 
 export default function AdminLayout() {
   const { staff, signOut } = useAuth();

@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Mail, MessageCircle, Menu, X } from 'lucide-react';
 import { InstagramIcon as Instagram, FacebookIcon as Facebook } from '../components/SocialIcons';
 import { CatalogProvider } from './useCatalog';
+import { SizeGuideLink } from './SizeGuide';
 import { BRAND, asset, whatsappLink } from '../lib/brand';
 
 export default function ShowroomLayout() {
@@ -58,6 +59,7 @@ export default function ShowroomLayout() {
             <div>
               <p className="font-display text-xs tracking-[0.3em] text-gold">HOW TO ORDER</p>
               <p className="mt-4 text-sm text-neutral-400">Choose a design and size, then tap <b className="text-ivory">Enquire on WhatsApp</b>. We'll confirm availability, delivery and payment with you personally.</p>
+              <SizeGuideLink />
             </div>
           </div>
           <div className="border-t border-white/5 py-6 text-center text-[11px] tracking-[0.25em] text-neutral-500">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, MessageCircle, Loader2, Shirt } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Loader2, Shirt, Ruler } from 'lucide-react';
+import { SizeGuide } from './SizeGuide';
 import { useCatalog } from './useCatalog';
 import ProductCard, { mainImage } from './ProductCard';
 import { mediaUrl } from '../lib/storage';
@@ -14,6 +15,8 @@ export default function ProductPage() {
   const [active, setActive] = useState<string | undefined>();
   const [size, setSize] = useState('');
   const [color, setColor] = useState('');
+  const [guide, setGuide] = useState(false);
+  const chart = catalog?.size_charts?.find((c) => c.id === p?.size_chart_id);
 
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
   useEffect(() => {
@@ -75,7 +78,10 @@ export default function ProductPage() {
 
           {p.sizes.length > 0 && (
             <div className="mt-8">
-              <p className="font-display text-[11px] tracking-[0.3em] text-neutral-400">SELECT SIZE</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-display text-[11px] tracking-[0.3em] text-neutral-400">SELECT SIZE</p>
+                {chart && <button onClick={() => setGuide(true)} className="flex items-center gap-1.5 font-display text-[11px] tracking-[0.2em] text-gold underline-offset-4 hover:underline"><Ruler className="h-3.5 w-3.5" /> SIZE GUIDE</button>}
+              </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {p.sizes.map((s) => <button key={s} onClick={() => setSize(size === s ? '' : s)} className={`min-w-12 rounded-sm border px-4 py-2.5 text-sm transition ${size === s ? 'border-gold bg-gold text-ink' : 'border-white/20 hover:border-gold'}`}>{s}</button>)}
               </div>
@@ -94,6 +100,7 @@ export default function ProductPage() {
             className="mt-10 flex w-full items-center justify-center gap-3 rounded-full bg-[#25D366] px-8 py-4 font-display text-xs font-semibold tracking-[0.25em] text-white transition hover:brightness-110">
             <MessageCircle className="h-5 w-5" /> ENQUIRE ON WHATSAPP
           </a>
+          {chart && <SizeGuide charts={[chart]} open={guide} onClose={() => setGuide(false)} title={`Size guide · ${chart.name}`} />}
           <p className="mt-3 text-center text-xs text-neutral-500">No online checkout — we confirm availability, delivery and payment with you directly.</p>
         </div>
       </div>

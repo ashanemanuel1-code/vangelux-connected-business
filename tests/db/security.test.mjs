@@ -133,6 +133,17 @@ await db.query(`insert into inventory_movements (product_id,movement_type,quanti
 const conceptStock = (await db.query(`select quantity from stock_levels where product_id=$1`, [p2])).rows[0]?.quantity;
 ok(conceptStock === 5, 'concept design can hold stock recorded in Inventory');
 
+console.log('\n== Size charts ==');
+const chart = (await db.query(`insert into size_charts (name, image_path) values ('Oversized Tee – Adult','size-charts/a.png') returning id`)).rows[0];
+await db.query(`insert into size_charts (name, image_path, is_published) values ('Hidden draft chart','size-charts/b.png', false)`);
+await db.query(`update products set size_chart_id=$1 where id=$2`, [chart.id, p1]);
+await asAnon();
+await expectError(`select * from public.size_charts`, 'anon cannot read the size_charts table directly');
+const cat2 = (await db.query(`select public.get_showroom_catalog() c`)).rows[0].c;
+ok(cat2.size_charts.length === 1 && cat2.size_charts[0].name === 'Oversized Tee – Adult', 'showroom gets only published size charts');
+ok(cat2.products.some((p) => p.size_chart_id === chart.id), 'showroom product carries its size chart');
+await asUser(OWNER);
+
 console.log('\n== From stock or to order (pre-orders) ==');
 await db.query(`insert into inventory_movements (product_id,size,color,movement_type,quantity) values ($1,'S','Black','addition',2)`, [p1]);
 const stockS = async () => Number((await db.query(`select quantity from stock_levels where product_id=$1 and size='S'`, [p1])).rows[0]?.quantity ?? 0);

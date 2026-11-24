@@ -22,12 +22,14 @@ export default function ProductEditor() {
   const nav = useNavigate();
   const toast = useToast();
   const lk = useLookups();
+  const [charts, setCharts] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => { supabase.from('size_charts').select('id,name').order('sort_order').order('created_at').then(({ data }) => setCharts(data ?? [])); }, []);
   const [productId] = useState(() => id ?? crypto.randomUUID());
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
 
   const [f, setF] = useState({
-    name: '', sku: '', description: '', collection_id: '', category_id: '', target_customer_id: '', fit_type_id: '',
+    name: '', sku: '', description: '', collection_id: '', size_chart_id: '', category_id: '', target_customer_id: '', fit_type_id: '',
     sizes: [] as string[], colors: [] as string[], selling_price: 0, discount_percent: 0, is_concept: false,
     status: 'draft' as ProductStatus, low_stock_threshold: 5, sort_order: 0,
   });
@@ -51,7 +53,7 @@ export default function ProductEditor() {
       if (error || !data) { toast('error', 'Product not found'); nav('/admin/products'); return; }
       const p = data as Product;
       setF({
-        name: p.name, sku: p.sku, description: p.description ?? '', collection_id: p.collection_id ?? '', category_id: p.category_id ?? '',
+        name: p.name, sku: p.sku, description: p.description ?? '', collection_id: p.collection_id ?? '', size_chart_id: p.size_chart_id ?? '', category_id: p.category_id ?? '',
         target_customer_id: p.target_customer_id ?? '', fit_type_id: p.fit_type_id ?? '', sizes: p.sizes ?? [], colors: p.colors ?? [],
         selling_price: num(p.selling_price), discount_percent: num(p.discount_percent), is_concept: p.is_concept, status: p.status,
         low_stock_threshold: p.low_stock_threshold, sort_order: p.sort_order,
@@ -178,7 +180,7 @@ export default function ProductEditor() {
     try {
       const row = {
         id: productId, name: f.name.trim(), sku: f.sku.trim(), description: f.description.trim() || null,
-        collection_id: f.collection_id || null, category_id: f.category_id || null, target_customer_id: f.target_customer_id || null,
+        collection_id: f.collection_id || null, size_chart_id: f.size_chart_id || null, category_id: f.category_id || null, target_customer_id: f.target_customer_id || null,
         fit_type_id: f.fit_type_id || null, sizes: f.sizes, colors: f.colors, selling_price: num(f.selling_price),
         discount_percent: num(f.discount_percent), is_concept: f.is_concept, status, low_stock_threshold: num(f.low_stock_threshold), sort_order: num(f.sort_order),
       };
@@ -288,6 +290,13 @@ export default function ProductEditor() {
           </div>
           <Field label="Description"><textarea className="field min-h-24" value={f.description} onChange={(e) => set('description', e.target.value)} placeholder="The message, fabric, print details…" /></Field>
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Size chart" hint={charts.length ? 'Shown to customers as “Size guide”' : undefined}>
+              <select className="field" value={f.size_chart_id} onChange={(e) => set('size_chart_id', e.target.value)}>
+                <option value="">— None —</option>
+                {charts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {!charts.length && <Link to="/admin/size-charts" className="mt-1 inline-block text-xs font-semibold text-gold-dark hover:underline">+ Upload size charts first →</Link>}
+            </Field>
             <Field label="Collection">
               <select className="field" value={f.collection_id} onChange={(e) => set('collection_id', e.target.value)}>
                 <option value="">— None —</option>

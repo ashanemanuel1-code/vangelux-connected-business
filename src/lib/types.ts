@@ -22,7 +22,7 @@ export interface Product {
   id: string; name: string; sku: string; description: string | null; collection_id: string | null; category_id: string | null;
   target_customer_id: string | null; fit_type_id: string | null; sizes: string[]; colors: string[]; selling_price: number;
   discount_percent: number; is_concept: boolean; status: ProductStatus; low_stock_threshold: number; sort_order: number;
-  published_at: string | null; created_at: string; updated_at: string;
+  published_at: string | null; created_at: string; updated_at: string; size_chart_id?: string | null;
   product_images?: ProductImage[]; product_tags?: { tag_id: string }[]; product_costs?: ProductCosts | null;
 }
 
@@ -72,14 +72,16 @@ export interface StaffMember { user_id: string; email: string; full_name: string
 export interface PublicProduct {
   id: string; name: string; sku: string; description: string | null; collection_id: string | null; collection_name: string | null;
   category: string | null; fit_type: string | null; target_customer: string | null; sizes: string[]; colors: string[];
-  selling_price: number; discount_percent: number; published_at: string | null; sort_order: number;
+  selling_price: number; discount_percent: number; published_at: string | null; sort_order: number; size_chart_id?: string | null;
   images: { path: string; kind: ImageKind; is_main: boolean }[]; tags: { name: string; color: string }[];
 }
 export interface PublicCollection {
   id: string; volume_label: string | null; name: string; tagline: string | null; scripture: string | null;
   description: string | null; artwork_path: string | null; status: CollectionStatus; sort_order: number;
 }
-export interface PublicCatalog { version: number; collections: PublicCollection[]; products: PublicProduct[] }
+export interface PublicSizeChart { id: string; name: string; image_path: string; notes: string | null }
+export interface PublicCatalog { version: number; collections: PublicCollection[]; products: PublicProduct[]; size_charts?: PublicSizeChart[] }
+export interface SizeChart { id: string; name: string; image_path: string | null; notes: string | null; is_published: boolean; sort_order: number; created_at: string }
 
 export const PRODUCT_STATUSES: ProductStatus[] = ['draft', 'published', 'archived'];
 export const COLLECTION_STATUSES: CollectionStatus[] = ['concept', 'development', 'sampling', 'pre-launch', 'available', 'discontinued'];
