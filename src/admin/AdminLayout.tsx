@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
+import { isNativeApp } from '../lib/native';
 import {
   LayoutDashboard, Shirt, Layers, FileText, ShoppingBag, Receipt, Boxes, Users, Settings as SettingsIcon,
   LogOut, Menu, X, ExternalLink, ClipboardList,
@@ -45,7 +46,7 @@ export default function AdminLayout() {
     <div className="border-t border-white/10 p-3 text-xs text-neutral-400">
       <p className="truncate px-3">{staff?.email}</p>
       <p className="px-3 capitalize text-gold/80">{staff?.role}</p>
-      <Link to="/" target="_blank" className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/5 hover:text-ivory"><ExternalLink className="h-4 w-4" /> Public showroom</Link>
+      {!isNativeApp() && <Link to="/" target="_blank" className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/5 hover:text-ivory"><ExternalLink className="h-4 w-4" /> Public showroom</Link>}
       <button onClick={signOut} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/5 hover:text-ivory"><LogOut className="h-4 w-4" /> Sign out</button>
     </div>
   );

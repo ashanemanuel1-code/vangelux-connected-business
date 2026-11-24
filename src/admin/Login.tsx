@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, Link } from 'react-router-dom';
+import { isNativeApp } from '../lib/native';
 import { Lock, Mail } from 'lucide-react';
 import { supabase, isConfigured } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
@@ -72,7 +73,7 @@ export default function Login() {
             : <button onClick={() => { setMode('login'); setInfo(''); }} className="hover:text-gold">Back to sign in</button>}
           {mode === 'forgot' && info
             ? <Link to="/admin/reset-password" state={{ email }} className="text-gold">I have a code →</Link>
-            : <Link to="/" className="hover:text-gold">View showroom</Link>}
+            : !isNativeApp() && <Link to="/" className="hover:text-gold">View showroom</Link>}
         </div>
       </div>
     </div>

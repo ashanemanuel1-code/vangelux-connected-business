@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import { isNativeApp } from '../lib/native';
 import {
   ArrowLeft, Camera, ImagePlus, Star, Trash2, RefreshCw, Loader2, X, Eye, Archive, Lock, Save,
 } from 'lucide-react';
@@ -244,7 +245,7 @@ export default function ProductEditor() {
         <Link to="/admin/products" className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-ink"><ArrowLeft className="h-4 w-4" /> Products</Link>
         <div className="flex items-center gap-2">
           <Badge tone={f.status}>{f.status}</Badge>
-          {f.status === 'published' && <Link to={`/product/${productId}`} target="_blank" className="flex items-center gap-1 text-xs text-gold-dark hover:underline"><Eye className="h-3.5 w-3.5" /> View live</Link>}
+          {f.status === 'published' && !isNativeApp() && <Link to={`/product/${productId}`} target="_blank" className="flex items-center gap-1 text-xs text-gold-dark hover:underline"><Eye className="h-3.5 w-3.5" /> View live</Link>}
         </div>
       </div>
       <h1 className="mb-5 font-display text-2xl font-semibold">{isNew ? 'Add product' : f.name || 'Edit product'}</h1>

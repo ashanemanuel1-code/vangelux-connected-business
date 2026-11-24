@@ -11,6 +11,11 @@
     "test:db": "node tests/db/security.test.mjs supabase/migrations"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
     "@supabase/supabase-js": "^2.119.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.9",
@@ -22,6 +27,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
     "@electric-sql/pglite": "^0.5.17",
     "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.6",

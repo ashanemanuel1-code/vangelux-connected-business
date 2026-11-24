@@ -1,10 +1,18 @@
 import * as XLSX from 'xlsx';
+import { isNativeApp, saveFile } from './native';
 
 export function exportRows(rows: Record<string, unknown>[], filename: string, sheet = 'Data') {
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheet);
-  XLSX.writeFile(wb, filename, { bookType: filename.endsWith('.csv') ? 'csv' : 'xlsx' });
+  const bookType = filename.endsWith('.csv') ? 'csv' : 'xlsx';
+  if (isNativeApp()) {
+    // Android app: hand the file to the share menu (WhatsApp, Drive, Save to Files…)
+    const out = XLSX.write(wb, { type: 'array', bookType });
+    void saveFile(new Blob([out], { type: bookType === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
+    return;
+  }
+  XLSX.writeFile(wb, filename, { bookType });
 }
 
 /** "Cost per Item (LKR)" → "cost_per_item", "Invoice number" → "invoice_number". */

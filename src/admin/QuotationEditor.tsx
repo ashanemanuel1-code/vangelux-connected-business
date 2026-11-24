@@ -6,6 +6,7 @@ import { mediaUrl } from '../lib/storage';
 import { money, num, today, addDays, fmtDate, label } from '../lib/format';
 import { buildQuotationPdf, quoteTotals, toWhatsAppNumber } from '../lib/pdf';
 import { whatsappLink, BRAND } from '../lib/brand';
+import { isNativeApp, shareNativeFile } from '../lib/native';
 import { QUOTE_STATUSES, type Customer, type Quotation, type QuotationItem, type QuoteStatus } from '../lib/types';
 import { Badge, Button, Card, Field, Modal, Spinner, useToast, errMsg, confirmDialog } from '../components/ui';
 
@@ -116,6 +117,12 @@ export default function QuotationEditor() {
       if (!r) return;
       const url = URL.createObjectURL(r.blob);
       const summary = `VANGELUX Quotation ${r.qq.quote_number}\nFor: ${r.qq.customer_name}\nTotal: ${money(quoteTotals(r.qq, items).total)}\nValid until: ${fmtDate(addDays(r.qq.issue_date, r.qq.validity_days))}`;
+      if (isNativeApp()) {
+        // Android app: one share menu for preview / save / print / WhatsApp / email
+        const shared = await shareNativeFile(r.blob, r.file.name, kind === 'whatsapp' || kind === 'email' ? summary : undefined);
+        if (shared && (kind === 'whatsapp' || kind === 'email') && r.qq.status === 'draft') { await supabase.from('quotations').update({ status: 'sent' }).eq('id', r.qq.id); setQ((x) => ({ ...x, status: 'sent' })); }
+        return;
+      }
       if (kind === 'preview') setPreviewUrl(url);
       if (kind === 'download') { const a = document.createElement('a'); a.href = url; a.download = r.file.name; a.click(); }
       if (kind === 'print') {

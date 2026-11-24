@@ -6,6 +6,7 @@ import { ToastProvider, Spinner } from './components/ui';
 import ShowroomLayout from './showroom/ShowroomLayout';
 import ShowroomHome from './showroom/ShowroomHome';
 import ProductPage from './showroom/ProductPage';
+import { isNativeApp } from './lib/native';
 
 // Admin code is split out so customers never download it.
 const Login = lazy(() => import('./admin/Login'));
@@ -45,10 +46,13 @@ export default function App() {
           <ManifestSwitcher />
           <Suspense fallback={<div className="min-h-screen"><Spinner /></div>}>
             <Routes>
-              <Route element={<ShowroomLayout />}>
-                <Route index element={<ShowroomHome />} />
-                <Route path="product/:id" element={<ProductPage />} />
-              </Route>
+              {isNativeApp()
+                // Android app = owner's admin only. The public website stays the customer showroom.
+                ? <Route index element={<Navigate to="/admin" replace />} />
+                : <Route element={<ShowroomLayout />}>
+                    <Route index element={<ShowroomHome />} />
+                    <Route path="product/:id" element={<ProductPage />} />
+                  </Route>}
 
               <Route path="admin/login" element={<Login />} />
               <Route path="admin/reset-password" element={<ResetPassword />} />
@@ -68,7 +72,7 @@ export default function App() {
                 <Route path="customers" element={<Customers />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to={isNativeApp() ? '/admin' : '/'} replace />} />
             </Routes>
           </Suspense>
         </AuthProvider>

@@ -8,6 +8,7 @@ import { ORDER_STATUSES, PAYMENT_METHODS, PAYMENT_STATUSES, type Customer, type 
 import { saleTotal } from './Customers';
 import { buildInvoicePdf, saleTotals, toWhatsAppNumber } from '../lib/pdf';
 import { whatsappLink, BRAND } from '../lib/brand';
+import { isNativeApp, shareNativeFile } from '../lib/native';
 import { Badge, Button, Card, Empty, Field, Modal, PageHeader, Spinner, useToast, errMsg, confirmDialog } from '../components/ui';
 
 type P = { id: string; name: string; sku: string; sizes: string[]; colors: string[]; selling_price: number; discount_percent: number; status: string; is_concept: boolean };
@@ -141,6 +142,7 @@ export default function Sales() {
       const url = URL.createObjectURL(blob);
       const t = saleTotals(sale, items);
       const summary = `VANGELUX Invoice ${sale.invoice_number}\nFor: ${sale.customer_name || 'Customer'}\nTotal: ${money(t.total)}${t.balance > 0 && sale.payment_status !== 'refunded' ? `\nBalance due: ${money(t.balance)}` : '\nPaid in full — thank you!'}`;
+      if (isNativeApp()) { await shareNativeFile(blob, file.name, kind === 'whatsapp' || kind === 'email' ? summary : undefined); return; } // Android app: share menu for every option
       const download = () => { const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); };
       if (kind === 'preview') setPreviewUrl(url);
       if (kind === 'download') download();
