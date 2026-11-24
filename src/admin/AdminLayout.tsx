@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
 import { isNativeApp } from '../lib/native';
 import {
   LayoutDashboard, Shirt, Layers, FileText, ShoppingBag, Receipt, Boxes, Users, Settings as SettingsIcon,
-  LogOut, Menu, X, ExternalLink, ClipboardList, Ruler,
+  LogOut, Menu, X, ExternalLink, ClipboardList, Ruler, RefreshCw, Sparkles,
 } from 'lucide-react';
 import { useFulfilment } from '../lib/fulfilment';
+import { onUpdateReady, updateNow, checkAndRefresh } from '../lib/appUpdate';
 import { useAuth } from '../auth/AuthProvider';
 import { asset } from '../lib/brand';
 
@@ -28,6 +29,10 @@ export default function AdminLayout() {
   const { staff, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const fl = useFulfilment();
+  const [updateReady, setUpdateReady] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => onUpdateReady(setUpdateReady), []);
+  const refresh = async () => { setRefreshing(true); await checkAndRefresh(); };
   // Menu badges: amber = pieces you need to order, green = orders ready to hand over.
   const badge = (to: string) => to !== '/admin/to-order' ? null : (
     <span className="ml-auto flex gap-1">
@@ -48,6 +53,7 @@ export default function AdminLayout() {
       <p className="truncate px-3">{staff?.email}</p>
       <p className="px-3 capitalize text-gold/80">{staff?.role}</p>
       {!isNativeApp() && <Link to="/" target="_blank" className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/5 hover:text-ivory"><ExternalLink className="h-4 w-4" /> Public showroom</Link>}
+      <button onClick={refresh} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/5 hover:text-ivory"><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /> Refresh / check for updates</button>
       <button onClick={signOut} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/5 hover:text-ivory"><LogOut className="h-4 w-4" /> Sign out</button>
     </div>
   );
@@ -64,7 +70,10 @@ export default function AdminLayout() {
       {/* mobile top bar */}
       <header className="sticky top-0 z-30 flex items-center justify-between bg-ink px-4 py-3 lg:hidden" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
         <Link to="/admin"><img src={asset('brand/logo-white.png')} alt="VANGELUX" className="h-7" /></Link>
-        <button onClick={() => setOpen(true)} className="rounded-lg p-2 text-ivory" aria-label="Menu"><Menu className="h-5 w-5" /></button>
+        <div className="flex items-center gap-1">
+          <button onClick={refresh} className="rounded-lg p-2 text-ivory" aria-label="Refresh"><RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} /></button>
+          <button onClick={() => setOpen(true)} className="rounded-lg p-2 text-ivory" aria-label="Menu"><Menu className="h-5 w-5" /></button>
+        </div>
       </header>
       {open && (
         <div className="fixed inset-0 z-50 bg-black/60 lg:hidden" onClick={() => setOpen(false)}>
@@ -77,6 +86,13 @@ export default function AdminLayout() {
         </div>
       )}
 
+      {updateReady && (
+        <div className="sticky top-14 z-20 mx-auto mt-3 flex max-w-7xl items-center gap-3 rounded-xl border border-gold/50 bg-ink px-4 py-3 text-sm text-ivory shadow-lg lg:top-3 lg:mx-6" role="status">
+          <Sparkles className="h-4 w-4 shrink-0 text-gold" />
+          <span className="flex-1">A new version of VANGELUX Admin is ready. <span className="text-neutral-400">Save what you're doing, then update.</span></span>
+          <button onClick={() => updateNow()} className="rounded-full bg-gold px-4 py-1.5 text-xs font-semibold text-ink">Update now</button>
+        </div>
+      )}
       <main className="mx-auto max-w-7xl px-4 pb-28 pt-5 sm:px-6 lg:pb-10 lg:pt-8"><Outlet /></main>
 
       {/* mobile bottom nav */}

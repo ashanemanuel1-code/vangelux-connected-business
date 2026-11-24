@@ -11,7 +11,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' = we decide when to switch (see src/lib/appUpdate.ts), so an update never interrupts typing.
+      registerType: 'prompt',
       manifest: false, // we ship two manifests in /public (showroom + admin)
       includeAssets: ['favicon.png', 'apple-touch-icon.png', 'brand/*.png'],
       workbox: {
