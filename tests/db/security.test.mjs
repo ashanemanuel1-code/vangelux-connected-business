@@ -144,6 +144,15 @@ ok(cat2.size_charts.length === 1 && cat2.size_charts[0].name === 'Oversized Tee 
 ok(cat2.products.some((p) => p.size_chart_id === chart.id), 'showroom product carries its size chart');
 await asUser(OWNER);
 
+console.log('\n== Website & contact settings ==');
+await db.query(`update site_settings set content = '{"email":"hello@vangelux.lk","tiktok":""}'::jsonb where id='main'`);
+await asAnon();
+await expectError(`select * from public.site_settings`, 'anon cannot read site_settings directly');
+await expectError(`update public.site_settings set content='{}'::jsonb`, 'anon cannot change website settings');
+const cat3 = (await db.query(`select public.get_showroom_catalog() c`)).rows[0].c;
+ok(cat3.site?.email === 'hello@vangelux.lk', 'showroom receives the saved website settings');
+await asUser(OWNER);
+
 console.log('\n== From stock or to order (pre-orders) ==');
 await db.query(`insert into inventory_movements (product_id,size,color,movement_type,quantity) values ($1,'S','Black','addition',2)`, [p1]);
 const stockS = async () => Number((await db.query(`select quantity from stock_levels where product_id=$1 and size='S'`, [p1])).rows[0]?.quantity ?? 0);

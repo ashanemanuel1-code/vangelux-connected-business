@@ -3,10 +3,12 @@ import { NavLink, Outlet, Link } from 'react-router-dom';
 import { isNativeApp } from '../lib/native';
 import {
   LayoutDashboard, Shirt, Layers, FileText, ShoppingBag, Receipt, Boxes, Users, Settings as SettingsIcon,
-  LogOut, Menu, X, ExternalLink, ClipboardList, Ruler, RefreshCw, Sparkles,
+  LogOut, Menu, X, ExternalLink, ClipboardList, Ruler, RefreshCw, Sparkles, Globe,
 } from 'lucide-react';
 import { useFulfilment } from '../lib/fulfilment';
 import { onUpdateReady, updateNow, checkAndRefresh } from '../lib/appUpdate';
+import { applySite } from '../lib/brand';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { asset } from '../lib/brand';
 
@@ -21,6 +23,7 @@ const nav = [
   { to: '/admin/expenses', label: 'Expenses', icon: Receipt },
   { to: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { to: '/admin/customers', label: 'Customers', icon: Users },
+  { to: '/admin/website', label: 'Website & contact', icon: Globe },
   { to: '/admin/settings', label: 'Settings & Tags', icon: SettingsIcon },
 ];
 const mobileNav = [nav[0], nav[4], nav[5], nav[6]]; // Dashboard, Quotations, Sales, To order
@@ -32,6 +35,8 @@ export default function AdminLayout() {
   const [updateReady, setUpdateReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   useEffect(() => onUpdateReady(setUpdateReady), []);
+  // Your saved email / WhatsApp / text — used by invoices and quotations made here.
+  useEffect(() => { supabase.from('site_settings').select('content').eq('id', 'main').maybeSingle().then(({ data }) => applySite(data?.content)); }, []);
   const refresh = async () => { setRefreshing(true); await checkAndRefresh(); };
   // Menu badges: amber = pieces you need to order, green = orders ready to hand over.
   const badge = (to: string) => to !== '/admin/to-order' ? null : (

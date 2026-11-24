@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, X, Eye, Download, Printer, MessageCircle, Mail, Save, ShoppingBag, Trash2, Shirt } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { mediaUrl } from '../lib/storage';
-import { money, num, today, addDays, fmtDate, label } from '../lib/format';
+import { money, num, today, addDays, fmtDate, label, productDiscount, rescaleDiscount } from '../lib/format';
 import { buildQuotationPdf, quoteTotals, toWhatsAppNumber } from '../lib/pdf';
 import { whatsappLink, BRAND } from '../lib/brand';
 import { isNativeApp, shareNativeFile } from '../lib/native';
@@ -66,7 +66,9 @@ export default function QuotationEditor() {
   function pickProduct(i: number, pid: string) {
     const p = products.find((x) => x.id === pid);
     if (!p) return setItem(i, { product_id: null, sku: null });
-    setItem(i, { product_id: p.id, description: p.name, sku: p.sku, size: p.sizes[0] ?? '', color: p.colors[0] ?? '', unit_price: Math.round(num(p.selling_price) * (1 - num(p.discount_percent) / 100) * 100) / 100 });
+    // Full price + the product's discount shown separately (so it appears on the quotation).
+    const qty = Math.max(1, num(items[i]?.quantity) || 1);
+    setItem(i, { product_id: p.id, description: p.name, sku: p.sku, size: p.sizes[0] ?? '', color: p.colors[0] ?? '', unit_price: num(p.selling_price), discount_amount: productDiscount(p.selling_price, qty, p.discount_percent) });
   }
   function pickCustomer(cid: string) {
     const c = customers.find((x) => x.id === cid);
@@ -208,9 +210,9 @@ export default function QuotationEditor() {
                     <select className="field" value={it.size ?? ''} onChange={(e) => setItem(i, { size: e.target.value })}><option value="">Size</option>{(p?.sizes ?? []).map((s) => <option key={s}>{s}</option>)}{it.size && !p?.sizes.includes(it.size) && <option>{it.size}</option>}</select>
                     <input className="field" placeholder="Colour" list={`colors-${i}`} value={it.color ?? ''} onChange={(e) => setItem(i, { color: e.target.value })} />
                     <datalist id={`colors-${i}`}>{p?.colors.map((c) => <option key={c} value={c} />)}</datalist>
-                    <Field label="Qty"><input type="number" min={1} className="field" value={it.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} /></Field>
+                    <Field label="Qty"><input type="number" min={1} className="field" value={it.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value), discount_amount: rescaleDiscount(it, Number(e.target.value), products.find((x) => x.id === it.product_id)?.discount_percent ?? 0) })} /></Field>
                     <Field label="Unit price"><input type="number" className="field" value={it.unit_price || ''} onChange={(e) => setItem(i, { unit_price: Number(e.target.value) })} /></Field>
-                    <Field label="Discount"><input type="number" className="field" value={it.discount_amount || ''} onChange={(e) => setItem(i, { discount_amount: Number(e.target.value) })} /></Field>
+                    <Field label={(() => { const d = num(products.find((x) => x.id === it.product_id)?.discount_percent); return d ? `Discount (${d}% off)` : 'Discount'; })()}><input type="number" className="field" value={it.discount_amount || ''} onChange={(e) => setItem(i, { discount_amount: Number(e.target.value) })} /></Field>
                     <div className="flex items-end justify-between gap-2"><b className="text-sm">{money(num(it.quantity) * num(it.unit_price) - num(it.discount_amount))}</b>
                       <button onClick={() => setItems(items.filter((_, idx) => idx !== i))} className="rounded p-1 text-red-700 hover:bg-red-50"><X className="h-4 w-4" /></button></div>
                   </div>

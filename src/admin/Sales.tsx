@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, ShoppingBag, Trash2, Upload, Download, FileSpreadsheet, X, Eye, Printer, MessageCircle, Mail, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { money, fmtDate, today, num, label } from '../lib/format';
+import { money, fmtDate, today, num, label, productDiscount, rescaleDiscount } from '../lib/format';
 import { exportRows, readRows, parseDate, toNum } from '../lib/excel';
 import { useLiveRefresh } from '../lib/useRealtime';
 import { ORDER_STATUSES, PAYMENT_METHODS, PAYMENT_STATUSES, type Customer, type Sale, type SaleItem, type StockLevel } from '../lib/types';
@@ -66,7 +66,9 @@ export default function Sales() {
   function pickProduct(idx: number, pid: string) {
     const p = products.find((x) => x.id === pid);
     if (!p) return setItem(idx, { product_id: null });
-    setItem(idx, { product_id: p.id, description: p.name, size: p.sizes[0] ?? '', color: p.colors[0] ?? '', unit_price: Math.round(num(p.selling_price) * (1 - num(p.discount_percent) / 100) * 100) / 100 });
+    // Full price + the product's discount shown separately (so it appears on the invoice).
+    const qty = Math.max(1, num(edit?.items[idx]?.quantity) || 1);
+    setItem(idx, { product_id: p.id, description: p.name, size: p.sizes[0] ?? '', color: p.colors[0] ?? '', unit_price: num(p.selling_price), discount_amount: productDiscount(p.selling_price, qty, p.discount_percent) });
   }
   const draftTotal = edit ? edit.items.reduce((a, i) => a + num(i.quantity) * num(i.unit_price) - num(i.discount_amount), 0) - num(edit.discount_amount) + num(edit.delivery_fee) : 0;
   const inHand = (it: SaleItem) => stock.find((s) => s.product_id === it.product_id && s.size === (it.size ?? '') && s.color === (it.color ?? ''))?.quantity ?? 0;
@@ -296,9 +298,9 @@ export default function Sales() {
                     {!it.product_id && <input className="field col-span-2 sm:col-span-4" placeholder="Description" value={it.description} onChange={(e) => setItem(idx, { description: e.target.value })} />}
                     <select className="field sm:col-span-2" value={it.size ?? ''} onChange={(e) => setItem(idx, { size: e.target.value })}><option value="">Size</option>{(p?.sizes ?? []).map((s) => <option key={s}>{s}</option>)}{it.size && !p?.sizes.includes(it.size) && <option>{it.size}</option>}</select>
                     <select className="field sm:col-span-2" value={it.color ?? ''} onChange={(e) => setItem(idx, { color: e.target.value })}><option value="">Colour</option>{(p?.colors ?? []).map((s) => <option key={s}>{s}</option>)}{it.color && !p?.colors.includes(it.color) && <option>{it.color}</option>}</select>
-                    <Field label="Qty" className="sm:col-span-1"><input type="number" min={1} className="field" value={it.quantity} onChange={(e) => setItem(idx, { quantity: Number(e.target.value) })} /></Field>
+                    <Field label="Qty" className="sm:col-span-1"><input type="number" min={1} className="field" value={it.quantity} onChange={(e) => setItem(idx, { quantity: Number(e.target.value), discount_amount: rescaleDiscount(it, Number(e.target.value), p?.discount_percent ?? 0) })} /></Field>
                     <Field label="Unit price" className="sm:col-span-2"><input type="number" className="field" value={it.unit_price || ''} onChange={(e) => setItem(idx, { unit_price: Number(e.target.value) })} /></Field>
-                    <Field label="Discount" className="sm:col-span-2"><input type="number" className="field" value={it.discount_amount || ''} onChange={(e) => setItem(idx, { discount_amount: Number(e.target.value) })} /></Field>
+                    <Field label={p && num(p.discount_percent) ? `Discount (${num(p.discount_percent)}% off)` : 'Discount'} className="sm:col-span-2"><input type="number" className="field" value={it.discount_amount || ''} onChange={(e) => setItem(idx, { discount_amount: Number(e.target.value) })} /></Field>
                     <div className="col-span-2 flex items-end justify-between gap-2 sm:col-span-12">
                       <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-600">
                         {it.product_id && <span>In hand: <b>{available(it)}</b></span>}

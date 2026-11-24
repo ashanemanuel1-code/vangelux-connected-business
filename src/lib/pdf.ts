@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { BRAND, asset } from './brand';
+import { BRAND, SITE, asset } from './brand';
 import { fmtDate, addDays, num } from './format';
 import { urlToDataUrl } from './image';
 import type { Quotation, QuotationItem, Sale, SaleItem } from './types';
@@ -46,6 +46,28 @@ type DocOptions = {
   termsTitle?: string;
 };
 
+/** "- LKR 900\n(10% off)" when a line has a discount. */
+function discountCell(it: DocLine) {
+  const d = num(it.discount_amount);
+  if (!d) return '—';
+  const gross = num(it.quantity) * num(it.unit_price);
+  const pct = gross ? (d / gross) * 100 : 0;
+  const pctText = pct > 0 && Math.abs(pct - Math.round(pct * 10) / 10) < 0.05 ? `\n(${Math.round(pct * 10) / 10}% off)` : '';
+  return `- ${fmt(d)}${pctText}`;
+}
+
+/** Subtotal rows: shows product discounts separately so the customer sees what they saved. */
+function subtotalRows(items: DocLine[], orderDiscount: number, delivery: number): [string, string][] {
+  const gross = items.reduce((a, i) => a + num(i.quantity) * num(i.unit_price), 0);
+  const lineDisc = items.reduce((a, i) => a + num(i.discount_amount), 0);
+  const rows: [string, string][] = [['Subtotal', fmt(gross)]];
+  if (lineDisc) rows.push(['Product discounts', '- ' + fmt(lineDisc)]);
+  if (orderDiscount) rows.push([lineDisc ? 'Additional discount' : 'Discount', '- ' + fmt(orderDiscount)]);
+  rows.push(['Delivery', delivery ? fmt(delivery) : 'Free']);
+  if (lineDisc + orderDiscount > 0) rows.push(['You save', fmt(lineDisc + orderDiscount)]);
+  return rows;
+}
+
 /** Shared branded A4 layout used by quotations and invoices. */
 async function buildBrandedPdf(o: DocOptions): Promise<jsPDF> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -72,7 +94,7 @@ async function buildBrandedPdf(o: DocOptions): Promise<jsPDF> {
   const cust = o.customer.filter(Boolean) as string[];
   const custLines = cust.flatMap((l) => doc.splitTextToSize(l, W / 2 - M - 4) as string[]);
   custLines.forEach((l, i) => doc.text(l, M, y + 6 + i * 5));
-  ['VANGELUX', 'Faith-driven Christian streetwear', `WhatsApp: +${BRAND.whatsappNumber}`, BRAND.email, 'instagram.com/vangelux.co'].forEach((l, i) => doc.text(l, W / 2 + 4, y + 6 + i * 5));
+  ['VANGELUX', SITE.docSubtitle, `WhatsApp: ${SITE.whatsappDisplay || '+' + BRAND.whatsappNumber}`, SITE.email, SITE.instagramHandle ? `Instagram: ${SITE.instagramHandle}` : ''].filter(Boolean).forEach((l, i) => doc.text(l, W / 2 + 4, y + 6 + i * 5));
   y += 8 + Math.max(custLines.length, 5) * 5;
 
   // pre-load thumbnails
@@ -87,7 +109,7 @@ async function buildBrandedPdf(o: DocOptions): Promise<jsPDF> {
     body: o.items.map((it) => [
       ...(hasImg ? [''] : []),
       `${it.description}${it.sku ? `\n${it.sku}` : ''}`, it.size || '—', it.color || '—', String(it.quantity),
-      fmt(it.unit_price), num(it.discount_amount) ? fmt(it.discount_amount) : '—', fmt(num(it.quantity) * num(it.unit_price) - num(it.discount_amount)),
+      fmt(it.unit_price), discountCell(it), fmt(num(it.quantity) * num(it.unit_price) - num(it.discount_amount)),
     ]),
     theme: 'grid',
     styles: { font: 'helvetica', fontSize: 9, cellPadding: 2.5, valign: 'middle', lineColor: [225, 220, 205], lineWidth: 0.2, textColor: INK },
@@ -162,9 +184,7 @@ async function buildBrandedPdf(o: DocOptions): Promise<jsPDF> {
 /** Builds a branded A4 quotation PDF. `imageUrls` maps item index → product image URL. */
 export async function buildQuotationPdf(q: Quotation, items: QuotationItem[], imageUrls: (string | null)[]): Promise<jsPDF> {
   const t = quoteTotals(q, items);
-  const rows: [string, string][] = [['Subtotal', fmt(t.subtotal)]];
-  if (t.discount) rows.push(['Discount', '- ' + fmt(t.discount)]);
-  rows.push(['Delivery', t.delivery ? fmt(t.delivery) : 'Free']);
+  const rows = subtotalRows(items, t.discount, t.delivery);
   return buildBrandedPdf({
     title: 'QUOTATION', number: q.quote_number,
     meta: [`Date: ${fmtDate(q.issue_date)}`, `Valid until: ${fmtDate(addDays(q.issue_date, q.validity_days))}`],
@@ -186,11 +206,9 @@ export function saleTotals(s: Pick<Sale, 'discount_amount' | 'delivery_fee' | 'a
 }
 
 /** Builds a branded A4 invoice PDF for a sale. */
-export async function buildInvoicePdf(s: Sale, items: SaleItem[], customer: { phone?: string | null; email?: string | null; address?: string | null } | null, terms = DEFAULT_INVOICE_TERMS): Promise<jsPDF> {
+export async function buildInvoicePdf(s: Sale, items: SaleItem[], customer: { phone?: string | null; email?: string | null; address?: string | null } | null, terms = SITE.invoiceThanks || DEFAULT_INVOICE_TERMS): Promise<jsPDF> {
   const t = saleTotals(s, items);
-  const rows: [string, string][] = [['Subtotal', fmt(t.subtotal)]];
-  if (t.discount) rows.push(['Discount', '- ' + fmt(t.discount)]);
-  rows.push(['Delivery', t.delivery ? fmt(t.delivery) : 'Free']);
+  const rows = subtotalRows(items, t.discount, t.delivery);
   const pm = s.payment_method ? s.payment_method.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '';
   const after: [string, string, boolean?][] = s.payment_status === 'refunded'
     ? [['Status', 'Refunded', true]]

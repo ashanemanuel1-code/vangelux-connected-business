@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { applySite } from '../lib/brand';
 import { supabase, isConfigured } from '../lib/supabase';
 import type { PublicCatalog } from '../lib/types';
 
@@ -27,7 +28,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     inflight.current = true;
     const { data, error } = await supabase.rpc('get_showroom_catalog');
     inflight.current = false;
-    if (error) setError(error.message); else { setCatalog(data as PublicCatalog); setError(''); }
+    if (error) setError(error.message); else { applySite((data as PublicCatalog).site); setCatalog(data as PublicCatalog); setError(''); }
     setLoading(false);
     if (queued.current) { queued.current = false; fetchCatalog(); }
   }, []);

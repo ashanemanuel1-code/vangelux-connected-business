@@ -23,6 +23,7 @@ const Expenses = lazy(() => import('./admin/Expenses'));
 const Inventory = lazy(() => import('./admin/Inventory'));
 const ToOrder = lazy(() => import('./admin/ToOrder'));
 const SizeCharts = lazy(() => import('./admin/SizeCharts'));
+const SiteSettings = lazy(() => import('./admin/SiteSettings'));
 const Customers = lazy(() => import('./admin/Customers'));
 const Settings = lazy(() => import('./admin/Settings'));
 
@@ -71,6 +72,7 @@ export default function App() {
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="to-order" element={<ToOrder />} />
                 <Route path="size-charts" element={<SizeCharts />} />
+                <Route path="website" element={<SiteSettings />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="settings" element={<Settings />} />
               </Route>

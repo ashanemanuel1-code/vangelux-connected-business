@@ -21,3 +21,18 @@ export const label = (s: string) => s.replace(/[_-]/g, ' ').replace(/\b\w/g, (c)
 export function effectivePrice(price: number, discountPercent: number) {
   return round2(num(price) * (1 - num(discountPercent) / 100));
 }
+
+/** Discount (LKR) for a line from a product's discount %, e.g. 4,500 × 2 at 10% → 900. */
+export function productDiscount(unitPrice: number, qty: number, discountPercent: number) {
+  return Math.round(num(unitPrice) * Math.max(1, num(qty)) * num(discountPercent)) / 100;
+}
+
+/**
+ * When the quantity changes, keep a product's automatic discount in step
+ * (only if the line still carries exactly the automatic amount — manual discounts are left alone).
+ */
+export function rescaleDiscount(line: { unit_price: number; quantity: number; discount_amount: number }, newQty: number, discountPercent: number) {
+  if (!num(discountPercent)) return line.discount_amount;
+  const auto = productDiscount(line.unit_price, line.quantity, discountPercent);
+  return Math.abs(num(line.discount_amount) - auto) < 0.01 ? productDiscount(line.unit_price, newQty, discountPercent) : line.discount_amount;
+}

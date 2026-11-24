@@ -3,11 +3,12 @@ import { ChevronDown, MessageCircle, Loader2 } from 'lucide-react';
 import { useCatalog } from './useCatalog';
 import ProductCard from './ProductCard';
 import { mediaUrl } from '../lib/storage';
-import { BRAND, asset, whatsappLink } from '../lib/brand';
+import { asset, whatsappLink, useSite } from '../lib/brand';
 import { label } from '../lib/format';
 
 export default function ShowroomHome() {
   const { catalog, loading, error } = useCatalog();
+  const site = useSite();
   const [col, setCol] = useState('');
   const [cat, setCat] = useState('');
   const products = useMemo(() => catalog?.products ?? [], [catalog]);
@@ -22,11 +23,11 @@ export default function ShowroomHome() {
         <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 px-5 py-12 lg:grid-cols-2">
           <div className="text-center lg:text-left">
             <img src={asset('brand/emblem-gold.png')} alt="" className="mx-auto mb-8 h-16 lg:mx-0" />
-            <p className="font-display text-xs tracking-[0.45em] text-gold">FAITH-DRIVEN STREETWEAR</p>
+            <p className="font-display text-xs tracking-[0.45em] text-gold">{site.heroEyebrow}</p>
             <h1 className="mt-5 font-display text-4xl font-semibold leading-[1.1] tracking-wide sm:text-5xl lg:text-6xl">
-              MORE THAN CLOTHING.<br /><span className="gold-text">A MESSAGE.</span>
+              {site.heroTitle}{site.heroTitleGold && <><br /><span className="gold-text">{site.heroTitleGold}</span></>}
             </h1>
-            <p className="mt-6 text-lg italic text-neutral-300">“{BRAND.tagline}”</p>
+            <p className="mt-6 text-lg italic text-neutral-300">“{site.tagline}”</p>
             <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
               <a href="#shop" onClick={(e) => { e.preventDefault(); document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="rounded-full bg-gold px-8 py-3.5 font-display text-xs font-semibold tracking-[0.25em] text-ink transition hover:bg-gold-light">EXPLORE THE COLLECTION</a>
@@ -46,30 +47,27 @@ export default function ShowroomHome() {
       <section id="story" className="bg-ivory text-ink">
         <div className="mx-auto max-w-5xl px-5 py-24 text-center">
           <p className="font-display text-xs tracking-[0.45em] text-gold-dark">OUR STORY</p>
-          <h2 className="mt-4 font-display text-3xl font-semibold tracking-wide sm:text-4xl">A message to the world.<br />A reminder to yourself.</h2>
+          <h2 className="mt-4 whitespace-pre-line font-display text-3xl font-semibold tracking-wide sm:text-4xl">{site.storyTitle}</h2>
           <div className="gold-rule mx-auto my-10 w-40" />
-          <p className="mx-auto max-w-3xl text-lg leading-relaxed text-neutral-700">
-            VANGELUX was born from a simple thought: what if the clothes we wear could do more than make a fashion statement?
-            What if they could carry a message, start conversations about Jesus, and remind us daily of whom we represent?
-          </p>
+          <p className="mx-auto max-w-3xl whitespace-pre-line text-lg leading-relaxed text-neutral-700">{site.storyText}</p>
           <div className="mt-14 grid gap-6 text-left md:grid-cols-2">
             <div className="rounded-sm border border-neutral-300 bg-white p-8">
               <p className="font-display text-xs tracking-[0.3em] text-gold-dark">TO THE WORLD</p>
-              <p className="mt-3 text-neutral-700">Biblical truth through meaningful design — creating curiosity, respectful conversations and hope in everyday places.</p>
+              <p className="mt-3 whitespace-pre-line text-neutral-700">{site.toWorld}</p>
             </div>
             <div className="rounded-sm border border-neutral-300 bg-white p-8">
               <p className="font-display text-xs tracking-[0.3em] text-gold-dark">TO THE WEARER</p>
-              <p className="mt-3 text-neutral-700">A daily reminder to live with grace, stand firm in faith, and honour Jesus — even when no one is watching.</p>
+              <p className="mt-3 whitespace-pre-line text-neutral-700">{site.toWearer}</p>
             </div>
           </div>
-          <p className="mt-12 font-display text-sm tracking-[0.2em] text-neutral-500">“I TELL YOU THAT, IF THESE SHOULD HOLD THEIR PEACE, THE STONES WOULD IMMEDIATELY CRY OUT.” — LUKE 19:40 (KJV)</p>
+          {site.scripture && <p className="mt-12 font-display text-sm uppercase tracking-[0.2em] text-neutral-500">{site.scripture}</p>}
         </div>
       </section>
 
       {/* COLLECTIONS */}
       <section id="collections" className="mx-auto max-w-7xl px-5 py-24">
         <div className="text-center"><p className="font-display text-xs tracking-[0.45em] text-gold">COLLECTIONS</p>
-          <h2 className="mt-3 font-display text-3xl tracking-wide">Wear the message</h2></div>
+          <h2 className="mt-3 font-display text-3xl tracking-wide">{site.collectionsTitle}</h2></div>
         {loading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-gold" /></div> : (
           <div className="mt-12 grid gap-6 md:grid-cols-2">
             {(catalog?.collections ?? []).map((c) => {
@@ -101,7 +99,7 @@ export default function ShowroomHome() {
       <section id="shop" className="border-t border-white/5 bg-charcoal/40">
         <div className="mx-auto max-w-7xl px-5 py-24">
           <div className="text-center"><p className="font-display text-xs tracking-[0.45em] text-gold">THE CATALOGUE</p>
-            <h2 className="mt-3 font-display text-3xl tracking-wide">Shop the message</h2></div>
+            <h2 className="mt-3 font-display text-3xl tracking-wide">{site.shopTitle}</h2></div>
           <div className="no-scrollbar mt-10 flex gap-2 overflow-x-auto pb-1 md:justify-center">
             <Chip on={!col && !cat} onClick={() => { setCol(''); setCat(''); }}>All</Chip>
             {(catalog?.collections ?? []).map((c) => <Chip key={c.id} on={col === c.id} onClick={() => setCol(col === c.id ? '' : c.id)}>{c.volume_label ?? c.name}</Chip>)}
@@ -113,7 +111,7 @@ export default function ShowroomHome() {
             : shown.length === 0 ? (
               <div className="py-20 text-center">
                 <p className="font-display tracking-widest text-neutral-400">NEW PIECES ARE ON THE WAY</p>
-                <p className="mt-2 text-sm text-neutral-500">Follow <a className="text-gold" href={BRAND.instagram} target="_blank" rel="noreferrer">@vangelux.co</a> for the launch.</p>
+                <p className="mt-2 text-sm text-neutral-500">Follow <a className="text-gold" href={site.instagram} target="_blank" rel="noreferrer">{site.instagramHandle}</a> for the launch.</p>
               </div>
             ) : (
               <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-12 sm:gap-x-6 lg:grid-cols-3 xl:grid-cols-4">

@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Mail, MessageCircle, Menu, X } from 'lucide-react';
-import { InstagramIcon as Instagram, FacebookIcon as Facebook } from '../components/SocialIcons';
+import { InstagramIcon as Instagram, FacebookIcon as Facebook, TikTokIcon as TikTok } from '../components/SocialIcons';
 import { CatalogProvider } from './useCatalog';
 import { SizeGuideLink } from './SizeGuide';
-import { BRAND, asset, whatsappLink } from '../lib/brand';
+import { asset, whatsappLink, useSite } from '../lib/brand';
 
 export default function ShowroomLayout() {
   const loc = useLocation();
   const [open, setOpen] = useState(false);
+  const site = useSite();
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => { const f = () => setScrolled(window.scrollY > 30); f(); window.addEventListener('scroll', f); return () => window.removeEventListener('scroll', f); }, []);
   useEffect(() => { setOpen(false); }, [loc]);
@@ -45,25 +46,26 @@ export default function ShowroomLayout() {
           <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 md:grid-cols-3">
             <div>
               <img src={asset('brand/logo-white.png')} alt="VANGELUX" className="w-56" />
-              <p className="mt-4 max-w-xs text-sm text-neutral-400">Faith-driven Christian streetwear. {BRAND.philosophy}</p>
+              <p className="mt-4 max-w-xs whitespace-pre-line text-sm text-neutral-400">{site.footerAbout}</p>
             </div>
             <div>
               <p className="font-display text-xs tracking-[0.3em] text-gold">CONTACT</p>
               <ul className="mt-4 space-y-3 text-sm text-neutral-300">
-                <li><a href={BRAND.whatsapp} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold"><MessageCircle className="h-4 w-4" /> WhatsApp +94 77 627 1143</a></li>
-                <li><a href={`mailto:${BRAND.email}`} className="flex items-center gap-3 hover:text-gold"><Mail className="h-4 w-4" /> {BRAND.email}</a></li>
-                <li><a href={BRAND.instagram} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold"><Instagram className="h-4 w-4" /> @vangelux.co</a></li>
-                <li><a href={BRAND.facebook} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold"><Facebook className="h-4 w-4" /> VANGELUX on Facebook</a></li>
+                <li><a href={`https://wa.me/${site.whatsappNumber}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold"><MessageCircle className="h-4 w-4" /> WhatsApp {site.whatsappDisplay}</a></li>
+                <li><a href={`mailto:${site.email}`} className="flex items-center gap-3 break-all hover:text-gold"><Mail className="h-4 w-4 shrink-0" /> {site.email}</a></li>
+                {site.instagram && <li><a href={site.instagram} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold"><Instagram className="h-4 w-4" /> {site.instagramHandle || 'Instagram'}</a></li>}
+                {site.facebook && <li><a href={site.facebook} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold"><Facebook className="h-4 w-4" /> {site.facebookLabel || 'Facebook'}</a></li>}
+                {site.tiktok && <li><a href={site.tiktok} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold"><TikTok className="h-4 w-4" /> {site.tiktokHandle || 'TikTok'}</a></li>}
               </ul>
             </div>
             <div>
               <p className="font-display text-xs tracking-[0.3em] text-gold">HOW TO ORDER</p>
-              <p className="mt-4 text-sm text-neutral-400">Choose a design and size, then tap <b className="text-ivory">Enquire on WhatsApp</b>. We'll confirm availability, delivery and payment with you personally.</p>
+              <p className="mt-4 whitespace-pre-line text-sm text-neutral-400">{site.howToOrder}</p>
               <SizeGuideLink />
             </div>
           </div>
           <div className="border-t border-white/5 py-6 text-center text-[11px] tracking-[0.25em] text-neutral-500">
-            © {new Date().getFullYear()} VANGELUX · {BRAND.tagline.toUpperCase()}
+            © {new Date().getFullYear()} VANGELUX · {site.tagline.toUpperCase()}
           </div>
         </footer>
 
