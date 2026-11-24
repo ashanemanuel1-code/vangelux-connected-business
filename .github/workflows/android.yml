@@ -1,0 +1,56 @@
+name: Build Android admin app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['capacitor.config.ts', 'app-assets/**', '.github/workflows/android.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install
+        run: npm ci
+      - name: Build web files (used for the offline screen)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: Create Android project
+        run: npx cap add android
+      - name: App icon and splash screen
+        run: npx --yes @capacitor/assets@4.0.0 generate --android --assetPath app-assets --iconBackgroundColor '#0B0B0B' --iconBackgroundColorDark '#0B0B0B' --splashBackgroundColor '#0B0B0B' --splashBackgroundColorDark '#0B0B0B'
+      - name: Sync
+        run: npx cap sync android
+      - name: Use the same signing key every time
+        run: mkdir -p ~/.android && cp app-assets/android-signing.keystore ~/.android/debug.keystore
+      - name: Build APK
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Name the file
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk VANGELUX-Admin.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VANGELUX-Admin-apk
+          path: VANGELUX-Admin.apk
+      - name: Publish on the Releases page
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: admin-app
+          name: VANGELUX Admin (Android app)
+          body: Download VANGELUX-Admin.apk below on your Android phone and open it to install.
+          files: VANGELUX-Admin.apk
+          make_latest: true
