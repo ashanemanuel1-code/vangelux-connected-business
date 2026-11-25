@@ -16,6 +16,53 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Self-repair: if the app can't start (old or broken copy saved on this device, missing files),
+         clear the saved copy and load a fresh one. Runs before the app itself. -->
+    <script>
+      (function () {
+        var KEY = 'vgx-heal-at', WAIT_MS = 12000;
+        function freshUrl() { var u = new URL(location.href); u.searchParams.set('r', Date.now().toString(36)); return u.toString(); }
+        function clearSavedCopy(extra) {
+          var jobs = [];
+          // Re-download this page's own files so the browser forgets any old or "not found" answers it remembered.
+          try {
+            var urls = [location.href.split('#')[0]].concat(extra || []);
+            [].forEach.call(document.querySelectorAll('script[src],link[rel=stylesheet][href],link[rel=modulepreload][href]'), function (el) { urls.push(el.src || el.href); });
+            urls.forEach(function (u) { if (u && u.indexOf(location.origin) === 0) jobs.push(fetch(u, { cache: 'reload' }).catch(function () {})); });
+          } catch (e) {}
+          try { if ('serviceWorker' in navigator) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); })); } catch (e) {}
+          try { if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })); } catch (e) {}
+          return Promise.all(jobs).catch(function () {});
+        }
+        function showHelp(msg) {
+          var root = document.getElementById('root');
+          if (!root || root.childElementCount) return;
+          root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0B0B0B;color:#F5F0E6;font-family:system-ui,sans-serif;text-align:center;padding:24px">'
+            + '<div><p style="color:#C9A44C;letter-spacing:.2em;font-weight:700;margin:0 0 12px">VANGELUX</p>'
+            + '<p style="margin:0 0 20px;color:#bbb">' + msg + '</p>'
+            + '<button id="vgx-retry" style="background:#C9A44C;color:#0B0B0B;border:0;border-radius:999px;padding:12px 26px;font-weight:700">Try again</button></div></div>';
+          document.getElementById('vgx-retry').onclick = function () { try { sessionStorage.removeItem(KEY); } catch (e) {} heal('manual', true); };
+        }
+        function heal(reason, force) {
+          if (!navigator.onLine) { showHelp('No internet connection. Connect and tap Try again.'); return; }
+          var last = 0; try { last = +sessionStorage.getItem(KEY) || 0; } catch (e) {}
+          if (!force && Date.now() - last < 60000) { showHelp('The app could not load. Check your connection and tap Try again.'); return; }
+          try { sessionStorage.setItem(KEY, String(Date.now())); } catch (e) {}
+          console.warn('[VANGELUX] self-repair:', reason);
+          clearSavedCopy(heal.failed).then(function () { location.replace(freshUrl()); });
+        }
+        window.__vgxHeal = heal;
+        // a file of this app failed to load (deleted after an update, broken upload…)
+        window.addEventListener('error', function (e) {
+          var t = e.target, src = t && (t.src || t.href) || '';
+          if ((t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) && src.indexOf(location.origin) === 0) { heal.failed = (heal.failed || []).concat(src); heal('file failed to load: ' + src); }
+        }, true);
+        // a page of the app (code chunk) is missing — usually an old copy after an update
+        window.addEventListener('vite:preloadError', function (e) { e.preventDefault(); heal('missing update file'); });
+        // the app never started
+        setTimeout(function () { if (!window.__vgxBooted) heal('app did not start'); }, WAIT_MS);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
