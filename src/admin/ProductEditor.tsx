@@ -11,7 +11,7 @@ import type { ImageKind, Product, ProductStatus, StockLevel } from '../lib/types
 import { useLookups } from './useAdminData';
 import { Badge, Button, Card, Field, Spinner, useToast, errMsg, confirmDialog } from '../components/ui';
 
-interface EditImage { id?: string; storage_path: string; kind: ImageKind; is_main: boolean; sort_order: number; uploading?: boolean; previewUrl?: string; key: string }
+interface EditImage { id?: string; storage_path: string; kind: ImageKind; is_main: boolean; sort_order: number; uploading?: boolean; previewUrl?: string; key: string; color?: string | null }
 
 const emptyCosts = { manufacturing_cost: 0, fabric_cost: 0, printing_cost: 0, packaging_cost: 0, transport_cost: 0, other_cost: 0, wholesale_price: 0, supplier: '', internal_notes: '' };
 type Costs = typeof emptyCosts;
@@ -157,6 +157,11 @@ export default function ProductEditor() {
   }
   const setMain = (img: EditImage) => setImages((imgs) => imgs.map((i) => ({ ...i, is_main: i.key === img.key })));
   const setKind = (img: EditImage, kind: ImageKind) => setImages((imgs) => imgs.map((i) => (i.key === img.key ? { ...i, kind } : i)));
+  const setImgColor = (img: EditImage, color: string) => setImages((imgs) => imgs.map((i) => (i.key === img.key ? { ...i, color: color || null } : i)));
+  const colorTag = (img: EditImage) => f.colors.length > 1 ? (
+    <select className="field mt-1 py-1 text-xs" value={img.color ?? ''} onChange={(e) => setImgColor(img, e.target.value)} title="Which colour is in this photo? Customers see it when they pick that colour.">
+      <option value="">All colours</option>{f.colors.map((c) => <option key={c} value={c}>{c}</option>)}
+    </select>) : null;
 
   // ---------- tags ----------
   const toggleTag = (tid: string) => setTagIds((t) => (t.includes(tid) ? t.filter((x) => x !== tid) : [...t, tid]));
@@ -206,7 +211,7 @@ export default function ProductEditor() {
       await supabase.from('product_images').update({ is_main: false }).eq('product_id', productId);
       if (images.length) {
         const imgRows = images.map((i, idx) => ({
-          ...(i.id ? { id: i.id } : {}), product_id: productId, storage_path: i.storage_path, kind: i.kind, is_main: i.is_main, sort_order: idx,
+          ...(i.id ? { id: i.id } : {}), product_id: productId, storage_path: i.storage_path, kind: i.kind, is_main: i.is_main, sort_order: idx, color: i.color && f.colors.includes(i.color) ? i.color : null,
         }));
         const withId = imgRows.filter((r) => 'id' in r);
         const withoutId = imgRows.filter((r) => !('id' in r));
@@ -265,7 +270,7 @@ export default function ProductEditor() {
               return (
                 <div key={kind}>
                   <p className="field-label">{kind === 'front' ? 'Front design' : 'Back design'}</p>
-                  {img ? <ImageTile img={img} onMain={setMain} onRemove={removeImage} onReplace={() => pick(kind, false, img.key)} />
+                  {img ? <><ImageTile img={img} onMain={setMain} onRemove={removeImage} onReplace={() => pick(kind, false, img.key)} />{colorTag(img)}</>
                     : <UploadSlot onGallery={() => pick(kind)} onCamera={() => pick(kind, true)} />}
                 </div>
               );
@@ -274,10 +279,11 @@ export default function ProductEditor() {
           <p className="field-label mt-4">Additional detail images</p>
           <div className="grid grid-cols-3 gap-2">
             {details.map((img) => (
-              <ImageTile key={img.key} img={img} small onMain={setMain} onRemove={removeImage} onReplace={() => pick('detail', false, img.key)} onKind={setKind} />
+              <div key={img.key}><ImageTile img={img} small onMain={setMain} onRemove={removeImage} onReplace={() => pick('detail', false, img.key)} onKind={setKind} />{colorTag(img)}</div>
             ))}
             <UploadSlot small onGallery={() => pick('detail')} onCamera={() => pick('detail', true)} />
           </div>
+          {f.colors.length > 1 && <p className="mt-3 text-xs text-neutral-500"><b>Colour photos:</b> set the colour under each photo (e.g. a White front photo). On the website, tapping a colour shows that colour's photos.</p>}
           <p className="mt-3 text-xs text-neutral-500">Tap ★ to choose the main image shown on the showroom. Photos are resized on your device and uploaded straight to cloud storage.</p>
         </Card>
 

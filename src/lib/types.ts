@@ -73,7 +73,7 @@ export interface PublicProduct {
   id: string; name: string; sku: string; description: string | null; collection_id: string | null; collection_name: string | null;
   category: string | null; fit_type: string | null; target_customer: string | null; sizes: string[]; colors: string[];
   selling_price: number; discount_percent: number; published_at: string | null; sort_order: number; size_chart_id?: string | null;
-  images: { path: string; kind: ImageKind; is_main: boolean }[]; tags: { name: string; color: string }[];
+  images: { path: string; kind: ImageKind; is_main: boolean; color?: string | null }[]; tags: { name: string; color: string }[];
 }
 export interface PublicCollection {
   id: string; volume_label: string | null; name: string; tagline: string | null; scripture: string | null;

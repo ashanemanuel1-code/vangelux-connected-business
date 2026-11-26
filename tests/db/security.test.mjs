@@ -153,6 +153,13 @@ const cat3 = (await db.query(`select public.get_showroom_catalog() c`)).rows[0].
 ok(cat3.site?.email === 'hello@vangelux.lk', 'showroom receives the saved website settings');
 await asUser(OWNER);
 
+console.log('\n== Photo colours ==');
+await db.query(`insert into product_images (product_id, storage_path, kind, color) values ($1,'products/x-white.jpg','front','White')`, [p1]);
+await asAnon();
+const cat4 = (await db.query(`select public.get_showroom_catalog() c`)).rows[0].c;
+ok(cat4.products.find((p) => p.id === p1)?.images.some((i) => i.color === 'White'), 'showroom photos carry their colour');
+await asUser(OWNER);
+
 console.log('\n== From stock or to order (pre-orders) ==');
 await db.query(`insert into inventory_movements (product_id,size,color,movement_type,quantity) values ($1,'S','Black','addition',2)`, [p1]);
 const stockS = async () => Number((await db.query(`select quantity from stock_levels where product_id=$1 and size='S'`, [p1])).rows[0]?.quantity ?? 0);

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, MessageCircle, Loader2, Shirt, Ruler } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Loader2, Ruler, Check } from 'lucide-react';
+import { Gallery } from './Gallery';
+import { delay } from './motion';
 import { SizeGuide } from './SizeGuide';
 import { useCatalog } from './useCatalog';
 import ProductCard, { mainImage } from './ProductCard';
-import { mediaUrl } from '../lib/storage';
 import { whatsappLink } from '../lib/brand';
 import { money0, effectivePrice, num } from '../lib/format';
 
@@ -16,6 +17,7 @@ export default function ProductPage() {
   const [size, setSize] = useState('');
   const [color, setColor] = useState('');
   const [guide, setGuide] = useState(false);
+  const [sent, setSent] = useState(0);
   const chart = catalog?.size_charts?.find((c) => c.id === p?.size_chart_id);
 
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
@@ -26,6 +28,19 @@ export default function ProductPage() {
     setSize((s) => (s && p.sizes.includes(s) ? s : ''));
     setColor((c) => (c && p.colors.includes(c) ? c : p.colors.length === 1 ? p.colors[0] : ''));
   }, [p]);
+
+  // Colour switcher: photos tagged with a colour show only for that colour; untagged photos always show.
+  const photos = (p?.images ?? []).filter((i) => !color || !i.color || i.color === color);
+  const pickColor = (c: string) => {
+    const next = color === c ? '' : c;
+    setColor(next);
+    if (!p || !next) return;
+    const ofColour = p.images.filter((i) => i.color === next);
+    const best = ofColour.find((i) => i.kind === 'front') ?? ofColour[0];
+    if (best) setActive(best.path);
+  };
+  useEffect(() => { if (active && photos.length && !photos.some((i) => i.path === active)) setActive(photos[0].path); }, [photos, active]);
+  const hasColourPhotos = (c: string) => !!p?.images.some((i) => i.color === c);
 
   if (loading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-gold" /></div>;
   if (!p) return (
@@ -50,23 +65,11 @@ export default function ProductPage() {
     <main className="mx-auto max-w-7xl px-5 pb-24 pt-24">
       <Link to="/" className="mb-6 inline-flex items-center gap-2 text-xs tracking-[0.2em] text-neutral-400 hover:text-gold"><ArrowLeft className="h-4 w-4" /> BACK</Link>
       <div className="grid gap-10 lg:grid-cols-2">
-        <div>
-          <div className="aspect-[4/5] overflow-hidden rounded-sm bg-charcoal">
-            {active ? <img src={mediaUrl(active)} alt={p.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-neutral-700"><Shirt className="h-16 w-16" /></div>}
-          </div>
-          {p.images.length > 1 && (
-            <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
-              {p.images.map((i) => (
-                <button key={i.path} onClick={() => setActive(i.path)} className={`relative h-24 w-20 shrink-0 overflow-hidden rounded-sm ${active === i.path ? 'ring-2 ring-gold' : 'opacity-70 hover:opacity-100'}`}>
-                  <img src={mediaUrl(i.path)} alt="" className="h-full w-full object-cover" />
-                  {i.kind !== 'detail' && <span className="absolute bottom-0 inset-x-0 bg-black/60 text-center text-[9px] uppercase tracking-wider">{i.kind}</span>}
-                </button>
-              ))}
-            </div>
-          )}
+        <div data-reveal="fade">
+          <Gallery images={photos} active={active} onChange={setActive} alt={p.name} />
         </div>
 
-        <div className="lg:pt-6">
+        <div className="lg:pt-6" data-reveal style={delay(150)}>
           {p.collection_name && <p className="font-display text-xs tracking-[0.3em] text-gold">{p.collection_name}</p>}
           <h1 className="mt-2 font-display text-3xl tracking-wide sm:text-4xl">{p.name}</h1>
           <p className="mt-2 text-sm text-neutral-500">{[p.category, p.fit_type, p.target_customer].filter(Boolean).join(' · ')}</p>
@@ -91,14 +94,16 @@ export default function ProductPage() {
             <div className="mt-6">
               <p className="font-display text-[11px] tracking-[0.3em] text-neutral-400">COLOUR</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {p.colors.map((c) => <button key={c} onClick={() => setColor(color === c ? '' : c)} className={`rounded-sm border px-4 py-2 text-sm ${color === c ? 'border-gold bg-gold text-ink' : 'border-white/20 hover:border-gold'}`}>{c}</button>)}
+                {p.colors.map((c) => <button key={c} onClick={() => pickColor(c)} className={`flex items-center gap-2 rounded-sm border px-4 py-2 text-sm transition ${color === c ? 'border-gold bg-gold text-ink' : 'border-white/20 hover:border-gold'}`}>
+                  <span className="h-3.5 w-3.5 rounded-full border border-white/40" style={{ background: swatch(c) }} />{c}{hasColourPhotos(c) && color !== c && <span className="text-[9px] tracking-wider text-gold">· PHOTOS</span>}</button>)}
               </div>
             </div>
           )}
 
-          <a href={whatsappLink(msg)} target="_blank" rel="noreferrer"
-            className="mt-10 flex w-full items-center justify-center gap-3 rounded-full bg-[#25D366] px-8 py-4 font-display text-xs font-semibold tracking-[0.25em] text-white transition hover:brightness-110">
+          <a href={whatsappLink(msg)} target="_blank" rel="noreferrer" onClick={() => setSent(Date.now())}
+            className="btn-sweep relative mt-10 flex w-full items-center justify-center gap-3 rounded-full bg-[#25D366] px-8 py-4 font-display text-xs font-semibold tracking-[0.25em] text-white transition hover:brightness-110">
             <MessageCircle className="h-5 w-5" /> ENQUIRE ON WHATSAPP
+            {sent > 0 && <span key={sent} className="pop-tick absolute inset-0 flex items-center justify-center gap-2 rounded-full bg-gold text-ink"><Check className="h-5 w-5" /> OPENING WHATSAPP…</span>}
           </a>
           {chart && <SizeGuide charts={[chart]} open={guide} onClose={() => setGuide(false)} title={`Size guide · ${chart.name}`} />}
           <p className="mt-3 text-center text-xs text-neutral-500">No online checkout — we confirm availability, delivery and payment with you directly.</p>
@@ -107,10 +112,18 @@ export default function ProductPage() {
 
       {related.length > 0 && (
         <section className="mt-24">
-          <p className="text-center font-display text-xs tracking-[0.4em] text-gold">YOU MAY ALSO LIKE</p>
-          <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4">{related.map((r) => <ProductCard key={r.id} p={r} />)}</div>
+          <p data-reveal className="text-center font-display text-xs tracking-[0.4em] text-gold">YOU MAY ALSO LIKE</p>
+          <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4">{related.map((r, i) => <div key={r.id} data-reveal style={delay(i * 110)}><ProductCard p={r} index={i} /></div>)}</div>
         </section>
       )}
     </main>
   );
+}
+
+/** A small colour dot for common colour names (falls back to grey). */
+function swatch(name: string) {
+  const n = name.toLowerCase();
+  const map: Record<string, string> = { black: '#0B0B0B', white: '#F5F5F5', ivory: '#F7F4EC', cream: '#F3E9D2', beige: '#D9C7A3', sand: '#CBB892', gold: '#C9A24A', grey: '#8A8A8A', gray: '#8A8A8A', charcoal: '#333', navy: '#1B2A4A', blue: '#2E5BBA', royal: '#172C63', red: '#B3261E', maroon: '#6D1A1A', green: '#2E6B3F', olive: '#6B6B2E', brown: '#6B4A2E', pink: '#E8A0B4', purple: '#5E3A87', yellow: '#E5C93A', orange: '#E07A2E' };
+  const key = Object.keys(map).find((k) => n.includes(k));
+  return key ? map[key] : '#777';
 }

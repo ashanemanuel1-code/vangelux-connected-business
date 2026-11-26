@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Mail, MessageCircle, Menu, X } from 'lucide-react';
 import { InstagramIcon as Instagram, FacebookIcon as Facebook, TikTokIcon as TikTok } from '../components/SocialIcons';
-import { CatalogProvider } from './useCatalog';
+import { CatalogProvider, useCatalog } from './useCatalog';
+import { useScrollReveal, Splash, Countdown } from './motion';
 import { SizeGuideLink } from './SizeGuide';
 import { asset, whatsappLink, useSite } from '../lib/brand';
 
@@ -13,6 +14,7 @@ export default function ShowroomLayout() {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => { const f = () => setScrolled(window.scrollY > 30); f(); window.addEventListener('scroll', f); return () => window.removeEventListener('scroll', f); }, []);
   useEffect(() => { setOpen(false); }, [loc]);
+  useScrollReveal();
 
   const go = (id: string) => (e: React.MouseEvent) => {
     e.preventDefault(); setOpen(false);
@@ -24,12 +26,14 @@ export default function ShowroomLayout() {
   return (
     <CatalogProvider>
       <div className="min-h-screen bg-ink text-ivory">
+        <SplashWhenReady />
         <header className={`fixed inset-x-0 top-0 z-40 transition ${scrolled || loc.pathname !== '/' ? 'bg-ink/95 shadow-lg backdrop-blur' : 'bg-transparent'}`} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <Countdown title={site.countdownTitle} at={site.countdownAt} link={site.countdownLink || undefined} />
           <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3">
             <Link to="/" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><img src={asset('brand/logo-white.png')} alt="VANGELUX" className="h-9 sm:h-10" /></Link>
             <nav className="hidden items-center gap-8 md:flex">
               {links.map(([id, l]) => <a key={id} href={`#${id}`} onClick={go(id)} className="font-display text-xs tracking-[0.25em] text-neutral-300 transition hover:text-gold">{l.toUpperCase()}</a>)}
-              <a href={whatsappLink('Hi VANGELUX! I would like to know more about your collection.')} target="_blank" rel="noreferrer" className="rounded-full border border-gold px-4 py-2 font-display text-[11px] tracking-[0.2em] text-gold hover:bg-gold hover:text-ink">ENQUIRE</a>
+              <a href={whatsappLink('Hi VANGELUX! I would like to know more about your collection.')} target="_blank" rel="noreferrer" className="btn-sweep rounded-full border border-gold px-4 py-2 font-display text-[11px] tracking-[0.2em] text-gold transition hover:bg-gold hover:text-ink">ENQUIRE</a>
             </nav>
             <button className="p-2 md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">{open ? <X /> : <Menu />}</button>
           </div>
@@ -40,7 +44,7 @@ export default function ShowroomLayout() {
           )}
         </header>
 
-        <Outlet />
+        <div key={loc.pathname} className="page-in"><Outlet /></div>
 
         <footer id="contact" className="border-t border-gold/20 bg-ink">
           <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 md:grid-cols-3">
@@ -70,10 +74,16 @@ export default function ShowroomLayout() {
         </footer>
 
         <a href={whatsappLink('Hi VANGELUX! I have an enquiry.')} target="_blank" rel="noreferrer" aria-label="WhatsApp"
-          className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl transition hover:scale-105" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
+          className="wa-pulse fixed bottom-5 right-5 z-40 isolate flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl transition hover:scale-110" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
           <MessageCircle className="h-7 w-7" />
         </a>
       </div>
     </CatalogProvider>
   );
+}
+
+/** Loading screen until the catalogue is ready (first visit only). */
+function SplashWhenReady() {
+  const { loading } = useCatalog();
+  return <Splash ready={!loading} />;
 }

@@ -31,3 +31,83 @@ body { @apply bg-ivory text-ink font-sans antialiased; -webkit-tap-highlight-col
   .field-label { @apply block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1.5; }
   .field { @apply w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/25 disabled:bg-neutral-100; }
 }
+
+/* =====================================================================
+   VANGELUX website animations (showroom only — the admin stays calm)
+   Everything turns off automatically for people who choose "reduce motion".
+   ===================================================================== */
+
+/* -- scroll reveal: add data-reveal to any element; style="--d:120ms" delays it -- */
+[data-reveal] { opacity: 0; transform: translateY(28px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0ms); }
+[data-reveal="fade"] { transform: none; }
+[data-reveal="zoom"] { transform: scale(.96); }
+[data-reveal].is-in { opacity: 1; transform: none; }
+
+/* -- hero intro -- */
+@keyframes vgx-glow-in { 0% { opacity: 0; transform: scale(.85); filter: drop-shadow(0 0 0 rgba(201,162,74,0)); } 60% { opacity: 1; filter: drop-shadow(0 0 22px rgba(201,162,74,.65)); } 100% { opacity: 1; transform: none; filter: drop-shadow(0 0 8px rgba(201,162,74,.35)); } }
+@keyframes vgx-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes vgx-word { from { opacity: 0; transform: translateY(.6em) rotateX(40deg); filter: blur(6px); } to { opacity: 1; transform: none; filter: blur(0); } }
+.intro-glow { animation: vgx-glow-in 1.6s cubic-bezier(.2,.7,.2,1) both; }
+.intro-rise { animation: vgx-rise 1s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 0ms); }
+.intro-word { display: inline-block; animation: vgx-word .9s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(500ms + var(--i, 0) * 130ms); }
+
+/* -- moving gold stage light behind the hero -- */
+@keyframes vgx-drift-a { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-6%, 4%) scale(1.12); } }
+@keyframes vgx-drift-b { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(5%, -5%) scale(1.08); } }
+.stage-light-a { animation: vgx-drift-a 16s ease-in-out infinite; }
+.stage-light-b { animation: vgx-drift-b 22s ease-in-out infinite; }
+
+/* -- gold sheen that sweeps across gold text -- */
+@keyframes vgx-sheen { 0% { background-position: 200% 50%; } 100% { background-position: -200% 50%; } }
+.gold-shimmer {
+  background: linear-gradient(100deg, #9C7A2E 0%, #E2C77E 25%, #C9A24A 40%, #FFF1C4 50%, #C9A24A 60%, #E2C77E 75%, #9C7A2E 100%);
+  background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: vgx-sheen 6s linear infinite;
+}
+
+/* -- buttons: a streak of light crosses on hover -- */
+.btn-sweep { position: relative; overflow: hidden; isolation: isolate; }
+.btn-sweep::after { content: ''; position: absolute; inset: -2px; z-index: -1; pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%); transform: translateX(-120%); transition: transform .8s ease; }
+.btn-sweep:hover::after, .btn-sweep:focus-visible::after { transform: translateX(120%); }
+
+/* -- product cards: 3D tilt with a gold light that follows the mouse -- */
+.tilt { transform-style: preserve-3d; transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .4s cubic-bezier(.2,.7,.2,1); will-change: transform; }
+.tilt-glare { pointer-events: none; position: absolute; inset: 0; opacity: 0; transition: opacity .4s;
+  background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(226,199,126,.28), transparent 55%); mix-blend-mode: screen; }
+.tilt:hover .tilt-glare { opacity: 1; }
+
+/* -- floating WhatsApp button: soft pulse every few seconds -- */
+@keyframes vgx-ping { 0% { transform: scale(1); opacity: .55; } 70%,100% { transform: scale(1.75); opacity: 0; } }
+.wa-pulse::before { content: ''; position: absolute; inset: 0; border-radius: 9999px; background: #25D366; z-index: -1; animation: vgx-ping 2.8s cubic-bezier(0,0,.2,1) infinite; }
+
+/* -- "Opening WhatsApp" tick -- */
+@keyframes vgx-pop { 0% { opacity: 0; transform: scale(.4); } 40% { opacity: 1; transform: scale(1.08); } 70% { transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
+.pop-tick { animation: vgx-pop 1.4s cubic-bezier(.2,.7,.2,1) both; }
+
+/* -- smooth page change -- */
+@keyframes vgx-page { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.page-in { animation: vgx-page .6s cubic-bezier(.2,.7,.2,1) both; }
+
+/* -- loading screen -- */
+@keyframes vgx-splash-out { to { opacity: 0; visibility: hidden; } }
+@keyframes vgx-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.splash-out { animation: vgx-splash-out .7s ease .1s forwards; }
+.splash-line { transform-origin: left; animation: vgx-line 1.4s cubic-bezier(.6,0,.2,1) both .3s; }
+
+/* -- scripture written letter by letter -- */
+@keyframes vgx-letter { from { opacity: 0; filter: blur(4px); } to { opacity: 1; filter: blur(0); } }
+.is-in .type-letter { animation: vgx-letter .5s ease both; animation-delay: calc(var(--i, 0) * 22ms); }
+.type-letter { opacity: 0; }
+
+/* -- countdown digits flip -- */
+@keyframes vgx-tick { from { transform: translateY(-40%); opacity: 0; } to { transform: none; opacity: 1; } }
+.digit-tick { display: inline-block; animation: vgx-tick .35s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal], .type-letter { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .intro-glow, .intro-rise, .intro-word, .stage-light-a, .stage-light-b, .gold-shimmer, .wa-pulse::before,
+  .page-in, .digit-tick, .is-in .type-letter, .splash-line { animation: none !important; }
+  .tilt { transform: none !important; }
+  .btn-sweep::after { display: none; }
+}

@@ -29,6 +29,14 @@ const GROUPS: { title: string; text: string; fields: FieldDef[] }[] = [
     ],
   },
   {
+    title: 'Launch countdown banner', text: 'A gold banner with a live countdown at the top of the website, e.g. for a new collection. It disappears by itself when the time is reached. Leave the title blank to hide it.',
+    fields: [
+      { key: 'countdownTitle', label: 'Banner text', hint: 'e.g. VOL. 02 UNASHAMED drops in' },
+      { key: 'countdownAt', label: 'Launch date & time', type: 'datetime-local' },
+      { key: 'countdownLink', label: 'Link when tapped (optional)', type: 'url', hint: 'e.g. your Instagram post' },
+    ],
+  },
+  {
     title: 'Website — top of the page', text: 'The first thing visitors see.',
     fields: [
       { key: 'heroEyebrow', label: 'Small heading', hint: 'e.g. FAITH-DRIVEN STREETWEAR' },
@@ -85,7 +93,7 @@ export default function SiteSettings() {
   async function save() {
     if (f.email && !/^\S+@\S+\.\S+$/.test(f.email)) return toast('error', 'Please check the email address');
     if (!f.whatsappNumber.replace(/\D/g, '')) return toast('error', 'Enter the WhatsApp number');
-    for (const k of ['instagram', 'facebook', 'tiktok'] as Key[]) {
+    for (const k of ['instagram', 'facebook', 'tiktok', 'countdownLink'] as Key[]) {
       if (f[k] && !/^https?:\/\//i.test(f[k])) return toast('error', `The ${k} link should start with https://`);
     }
     setSaving(true);
