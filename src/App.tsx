@@ -24,6 +24,7 @@ const Inventory = lazy(() => import('./admin/Inventory'));
 const ToOrder = lazy(() => import('./admin/ToOrder'));
 const SizeCharts = lazy(() => import('./admin/SizeCharts'));
 const SiteSettings = lazy(() => import('./admin/SiteSettings'));
+const Countdowns = lazy(() => import('./admin/Countdowns'));
 const Customers = lazy(() => import('./admin/Customers'));
 const Settings = lazy(() => import('./admin/Settings'));
 
@@ -73,6 +74,7 @@ export default function App() {
                 <Route path="to-order" element={<ToOrder />} />
                 <Route path="size-charts" element={<SizeCharts />} />
                 <Route path="website" element={<SiteSettings />} />
+                <Route path="countdowns" element={<Countdowns />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="settings" element={<Settings />} />
               </Route>

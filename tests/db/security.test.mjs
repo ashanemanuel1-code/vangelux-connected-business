@@ -145,6 +145,9 @@ ok(cat2.products.some((p) => p.size_chart_id === chart.id), 'showroom product ca
 await asUser(OWNER);
 
 console.log('\n== Website & contact settings ==');
+const saved = (await db.query(`update site_settings set content = '{"email":"owner@vangelux.lk"}'::jsonb where id = 'main' returning id`)).rows.length;
+ok(saved === 1, 'owner can save Website & contact (update)');
+
 await db.query(`update site_settings set content = '{"email":"hello@vangelux.lk","tiktok":""}'::jsonb where id='main'`);
 await asAnon();
 await expectError(`select * from public.site_settings`, 'anon cannot read site_settings directly');
@@ -158,6 +161,18 @@ await db.query(`insert into product_images (product_id, storage_path, kind, colo
 await asAnon();
 const cat4 = (await db.query(`select public.get_showroom_catalog() c`)).rows[0].c;
 ok(cat4.products.find((p) => p.id === p1)?.images.some((i) => i.color === 'White'), 'showroom photos carry their colour');
+await asUser(OWNER);
+
+console.log('\n== Countdowns ==');
+await db.query(`insert into launches (title, launch_at) values ('VOL. 02 UNASHAMED', now() + interval '4 days')`);
+await db.query(`insert into launches (title, launch_at) values ('Old drop, no after text', now() - interval '1 day')`);
+await db.query(`insert into launches (title, launch_at, ended_text) values ('Just launched', now() - interval '1 day', 'OUT NOW')`);
+await db.query(`insert into launches (title, launch_at, is_active) values ('Hidden', now() + interval '2 days', false)`);
+await asAnon();
+await expectError(`select * from public.launches`, 'anon cannot read launches directly');
+const cat5 = (await db.query(`select public.get_showroom_catalog() c`)).rows[0].c;
+const names = cat5.launches.map((l) => l.title);
+ok(names.includes('VOL. 02 UNASHAMED') && names.includes('Just launched') && !names.includes('Hidden') && !names.includes('Old drop, no after text'), 'showroom gets upcoming + "out now" countdowns only');
 await asUser(OWNER);
 
 console.log('\n== From stock or to order (pre-orders) ==');

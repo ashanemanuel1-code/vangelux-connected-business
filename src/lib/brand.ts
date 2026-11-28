@@ -15,10 +15,6 @@ export const SITE_DEFAULTS = {
   facebookLabel: 'VANGELUX on Facebook',
   tiktok: '',
   tiktokHandle: '',
-  // launch countdown banner (leave the title blank to hide it)
-  countdownTitle: '',
-  countdownAt: '',
-  countdownLink: '',
   // website text
   heroEyebrow: 'FAITH-DRIVEN STREETWEAR',
   heroTitle: 'MORE THAN CLOTHING.',
@@ -63,8 +59,8 @@ export function applySite(content: Partial<SiteContent> | null | undefined) {
   if (!content) return;
   for (const k of Object.keys(SITE_DEFAULTS) as (keyof SiteContent)[]) {
     const v = content[k];
-    // tiktok and countdown fields may be blank on purpose; everything else falls back to the default
-    SITE[k] = typeof v === 'string' && (v.trim() || k.startsWith('tiktok') || k.startsWith('countdown')) ? v.trim() : SITE_DEFAULTS[k];
+    // tiktok fields may be blank on purpose; everything else falls back to the default
+    SITE[k] = typeof v === 'string' && (v.trim() || k.startsWith('tiktok')) ? v.trim() : SITE_DEFAULTS[k];
   }
   SITE.whatsappNumber = SITE.whatsappNumber.replace(/\D/g, '') || SITE_DEFAULTS.whatsappNumber;
   Object.assign(BRAND, {

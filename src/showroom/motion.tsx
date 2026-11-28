@@ -127,30 +127,6 @@ export function Splash({ ready }: { ready: boolean }) {
   );
 }
 
-/** Launch countdown banner (set the title and date in Admin → Website & contact). */
-export function Countdown({ title, at, link }: { title: string; at: string; link?: string }) {
-  const target = at ? new Date(at).getTime() : NaN;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { if (!title || Number.isNaN(target)) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [title, target]);
-  if (!title || Number.isNaN(target) || target <= now) return null;
-  let s = Math.floor((target - now) / 1000);
-  const d = Math.floor(s / 86400); s -= d * 86400; const h = Math.floor(s / 3600); s -= h * 3600; const m = Math.floor(s / 60); s -= m * 60;
-  const parts: [number, string][] = [[d, 'd'], [h, 'h'], [m, 'm'], [s, 's']];
-  const body = (
-    <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-      <span className="font-display tracking-[0.25em]">{title.toUpperCase()}</span>
-      <span className="flex gap-1.5 tabular-nums">
-        {parts.map(([v, u]) => <span key={u} className="rounded bg-ink/15 px-1.5 py-0.5 font-semibold"><span key={v} className="digit-tick">{String(v).padStart(2, '0')}</span>{u}</span>)}
-      </span>
-    </span>
-  );
-  return (
-    <div className="bg-gradient-to-r from-gold-dark via-gold to-gold-dark px-4 py-2 text-center text-[11px] text-ink">
-      {link ? <a href={link} target="_blank" rel="noreferrer" className="hover:underline">{body}</a> : body}
-    </div>
-  );
-}
-
 /* -- Verse of the day (King James Version — public domain). One verse per calendar day. -- */
 const VERSES: [string, string][] = [
   ['Let your light so shine before men, that they may see your good works, and glorify your Father which is in heaven.', 'Matthew 5:16'],

@@ -3,7 +3,8 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Mail, MessageCircle, Menu, X } from 'lucide-react';
 import { InstagramIcon as Instagram, FacebookIcon as Facebook, TikTokIcon as TikTok } from '../components/SocialIcons';
 import { CatalogProvider, useCatalog } from './useCatalog';
-import { useScrollReveal, Splash, Countdown } from './motion';
+import { useScrollReveal, Splash } from './motion';
+import { LaunchBanner } from './Launches';
 import { SizeGuideLink } from './SizeGuide';
 import { asset, whatsappLink, useSite } from '../lib/brand';
 
@@ -28,7 +29,7 @@ export default function ShowroomLayout() {
       <div className="min-h-screen bg-ink text-ivory">
         <SplashWhenReady />
         <header className={`fixed inset-x-0 top-0 z-40 transition ${scrolled || loc.pathname !== '/' ? 'bg-ink/95 shadow-lg backdrop-blur' : 'bg-transparent'}`} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-          <Countdown title={site.countdownTitle} at={site.countdownAt} link={site.countdownLink || undefined} />
+          <LaunchBannerFromCatalog />
           <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3">
             <Link to="/" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><img src={asset('brand/logo-white.png')} alt="VANGELUX" className="h-9 sm:h-10" /></Link>
             <nav className="hidden items-center gap-8 md:flex">
@@ -86,4 +87,10 @@ export default function ShowroomLayout() {
 function SplashWhenReady() {
   const { loading } = useCatalog();
   return <Splash ready={!loading} />;
+}
+
+/** Slim gold countdown banner at the top (from Admin → Countdowns). */
+function LaunchBannerFromCatalog() {
+  const { catalog } = useCatalog();
+  return <LaunchBanner launches={catalog?.launches ?? []} />;
 }

@@ -80,7 +80,9 @@ export interface PublicCollection {
   description: string | null; artwork_path: string | null; status: CollectionStatus; sort_order: number;
 }
 export interface PublicSizeChart { id: string; name: string; image_path: string; notes: string | null }
-export interface PublicCatalog { version: number; collections: PublicCollection[]; products: PublicProduct[]; size_charts?: PublicSizeChart[]; site?: Record<string, string> }
+export interface PublicLaunch { id: string; title: string; subtitle: string | null; image_path: string | null; launch_at: string; button_label: string | null; link_url: string | null; ended_text: string | null; show_banner: boolean }
+export interface Launch extends PublicLaunch { is_active: boolean; created_at: string }
+export interface PublicCatalog { version: number; collections: PublicCollection[]; products: PublicProduct[]; size_charts?: PublicSizeChart[]; site?: Record<string, string>; launches?: PublicLaunch[] }
 export interface SizeChart { id: string; name: string; image_path: string | null; notes: string | null; is_published: boolean; sort_order: number; created_at: string }
 
 export const PRODUCT_STATUSES: ProductStatus[] = ['draft', 'published', 'archived'];

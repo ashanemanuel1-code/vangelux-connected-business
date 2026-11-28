@@ -3,7 +3,7 @@ import { NavLink, Outlet, Link } from 'react-router-dom';
 import { isNativeApp } from '../lib/native';
 import {
   LayoutDashboard, Shirt, Layers, FileText, ShoppingBag, Receipt, Boxes, Users, Settings as SettingsIcon,
-  LogOut, Menu, X, ExternalLink, ClipboardList, Ruler, RefreshCw, Sparkles, Globe,
+  LogOut, Menu, X, ExternalLink, ClipboardList, Ruler, RefreshCw, Sparkles, Globe, Timer,
 } from 'lucide-react';
 import { useFulfilment } from '../lib/fulfilment';
 import { onUpdateReady, updateNow, checkAndRefresh } from '../lib/appUpdate';
@@ -24,6 +24,7 @@ const nav = [
   { to: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { to: '/admin/customers', label: 'Customers', icon: Users },
   { to: '/admin/website', label: 'Website & contact', icon: Globe },
+  { to: '/admin/countdowns', label: 'Countdowns', icon: Timer },
   { to: '/admin/settings', label: 'Settings & Tags', icon: SettingsIcon },
 ];
 const mobileNav = [nav[0], nav[4], nav[5], nav[6]]; // Dashboard, Quotations, Sales, To order

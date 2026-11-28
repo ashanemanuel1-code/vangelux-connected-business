@@ -6,6 +6,7 @@ import { mediaUrl } from '../lib/storage';
 import { asset, whatsappLink, useSite } from '../lib/brand';
 import { label } from '../lib/format';
 import { Words, TypeLine, useParallax, delay, verseOfTheDay } from './motion';
+import { LaunchSection } from './Launches';
 
 export default function ShowroomHome() {
   const { catalog, loading, error } = useCatalog();
@@ -49,6 +50,9 @@ export default function ShowroomHome() {
         </div>
         <ChevronDown className="absolute bottom-6 left-1/2 h-6 w-6 -translate-x-1/2 animate-bounce text-gold/60" />
       </section>
+
+      {/* COUNTDOWNS (Admin → Countdowns) */}
+      <LaunchSection launches={catalog?.launches ?? []} />
 
       {/* STORY */}
       <section id="story" className="bg-ivory text-ink">
